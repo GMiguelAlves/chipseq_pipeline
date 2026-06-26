@@ -26,6 +26,10 @@ export FUNCTIONAL_ANNOTATION=""
 # Keeping OUTPUT_DIR as PROJECT_DIR reproduces the numbered directory layout.
 export OUTPUT_DIR="${PROJECT_DIR}"
 
+# Large TSV-like results are written as .tsv.gz by default, like the RNA-seq
+# pipeline. Set this to 0 only if you need plain text tables.
+export PIPELINE_COMPRESS_RESULTS=1
+
 # 5) Point to Conda on the Slurm server.
 # Absolute paths are safest. Relative paths are resolved from this file's
 # directory, so "../miniconda3" means "<project>/miniconda3".
@@ -64,3 +68,10 @@ export PROMOTER_UPSTREAM=2000
 export PROMOTER_DOWNSTREAM=500
 export BIGWIG_NORMALIZATION="CPM"
 export DIFF_CONTRASTS=""          # Example: treated:control,drug:vehicle
+
+# 11) Storage mode.
+# full: keep everything. Best for debugging and reruns.
+# balanced: remove temporary uncompressed reference copies and individual
+#           FastQC folders after the final report.
+# minimal: also remove trimmed FASTQs after final BAMs/reports exist.
+export PIPELINE_STORAGE_MODE="full"

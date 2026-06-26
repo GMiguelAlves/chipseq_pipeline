@@ -20,3 +20,24 @@ bash scripts/init_project.sh
 `config/user_settings.sh` automatically and defines all derived paths and
 defaults used by the scripts.
 
+Useful settings in `config/user_settings.sh`:
+
+- `PIPELINE_EXECUTOR`: use `slurm` or `local`
+- `CONDA_BASE`: path to Conda on the HPC server
+- `PIPELINE_COMPRESS_RESULTS`: use `1` to write large TSV-like outputs as
+  `.tsv.gz`; downstream steps read `.tsv` and `.tsv.gz`
+- `PIPELINE_STORAGE_MODE`: use `full`, `balanced`, or `minimal` to control
+  cleanup after the final report
+
+Gzipped reference files are supported:
+
+```bash
+export GENOME_FASTA="/path/to/genome.fa.gz"
+export ANNOTATION_FILE="/path/to/annotation.gtf.gz"
+```
+
+They are decompressed into `010-reference/data/` before indexing.
+
+`config/pipeline_config.local.example.sh` is kept only for backward
+compatibility with an earlier ChIP-seq layout. Prefer
+`config/user_settings_template.sh`.
