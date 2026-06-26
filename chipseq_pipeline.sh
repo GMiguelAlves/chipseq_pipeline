@@ -138,6 +138,9 @@ VALIDATE_METADATA_ARGS=(
 if bool_true "${REQUIRE_DIFF_REPLICATES}"; then
   VALIDATE_METADATA_ARGS+=(--require-diff-replicates)
 fi
+if bool_true "${ALLOW_MISSING_CONTROLS:-false}"; then
+  VALIDATE_METADATA_ARGS+=(--allow-missing-controls)
+fi
 "${VALIDATE_METADATA_ARGS[@]}"
 
 declare -A STEP_ALIASES=(
@@ -431,7 +434,11 @@ if has_step peaks; then
     dep=""
     if [[ "${RUN_ALL}" == "true" ]]; then
       control_id="$(metadata_value "${sample}" "control_id")"
-      dep="$(join_deps "${JOB_FILTER[${sample}]:-}" "${JOB_FILTER[${control_id}]:-}")"
+      if [[ -n "${control_id}" ]]; then
+        dep="$(join_deps "${JOB_FILTER[${sample}]:-}" "${JOB_FILTER[${control_id}]:-}")"
+      else
+        dep="$(join_deps "${JOB_FILTER[${sample}]:-}")"
+      fi
     fi
     submit_job "peaks" "${sample}" "${dep}" "${PEAK_SCRIPTS_DIR}/call_peaks.sh" "${sample}"
     JOB_PEAK["${sample}"]="${SUBMITTED_JOB_ID}"

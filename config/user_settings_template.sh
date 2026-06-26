@@ -40,6 +40,9 @@ export ALIGNER="bowtie2"          # bowtie2 or bwa
 export TRIM_TOOL="fastp"          # fastp or trim_galore
 export PEAK_CALLER="macs3"        # macs3 or macs2
 export PEAK_TYPE="auto"           # auto, narrow, or broad
+# Set to true only when matched input/control FASTQs are not available.
+# MACS will then run without -c for IP samples with an empty control_id.
+export ALLOW_MISSING_CONTROLS="false"
 
 # 7) Choose where jobs run.
 export PIPELINE_EXECUTOR="slurm"  # Use "local" to run without sbatch.

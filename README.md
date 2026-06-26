@@ -129,6 +129,7 @@ Important execution settings:
 - `TRIM_TOOL=fastp` or `trim_galore`
 - `PEAK_CALLER=macs3` or `macs2`
 - `PEAK_TYPE=auto`, `narrow`, or `broad`
+- `ALLOW_MISSING_CONTROLS=true` only when matched input/control FASTQs are not available
 - `PROMOTER_UPSTREAM` and `PROMOTER_DOWNSTREAM`
 - `PIPELINE_COMPRESS_RESULTS=1` to write large TSV-like outputs as `.tsv.gz`
 - `PIPELINE_STORAGE_MODE=full|balanced|minimal`
@@ -139,6 +140,23 @@ Copy the versioned template and edit the untracked metadata file:
 
 ```bash
 cp config/metadata_template.tsv config/metadata.tsv
+```
+
+For the Roquis et al. S. mansoni ChIP-seq SRA study without matched inputs, a
+ready-to-edit metadata draft is provided:
+
+```bash
+cp config/metadata_srp034587_no_input.tsv config/metadata.tsv
+```
+
+Use it with `ALLOW_MISSING_CONTROLS=true` in `config/user_settings.sh`. The
+metadata has one row per SRA experiment. Rows whose `sra_runs` column contains
+multiple runs must be concatenated into the FASTQ name listed in `fastq_1`
+before validation, for example:
+
+```bash
+cat data/fastq/SRR2120359.fastq.gz data/fastq/SRR2120360.fastq.gz > data/fastq/SRX1113460.fastq.gz
+cat data/fastq/SRR2120361.fastq.gz data/fastq/SRR2120744.fastq.gz > data/fastq/SRX1113461.fastq.gz
 ```
 
 Required columns:
@@ -154,6 +172,8 @@ Rules enforced before execution:
 - If `layout=paired`, `fastq_2` is required.
 - If `layout=single`, `fastq_2` may be empty.
 - If `is_control=false`, `control_id` must point to an existing control sample.
+- If `ALLOW_MISSING_CONTROLS=true`, `control_id` may be empty for IP samples and
+  MACS is run without `-c`; use this only when input/control data are unavailable.
 - If `is_control=true`, the sample is treated as input/control and peak calling is skipped.
 - Replicate counts are checked for differential binding readiness.
 

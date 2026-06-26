@@ -66,6 +66,8 @@ fi
 CONTROL_ARGS=""
 if [[ -n "${CONTROL_BAM}" ]]; then
   CONTROL_ARGS="-c '${CONTROL_BAM}'"
+else
+  log "${SAMPLE_ID}: no control_id/control BAM provided; running ${PEAK_CALLER} without matched input/control"
 fi
 
 BROAD_ARGS=""

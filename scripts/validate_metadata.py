@@ -59,8 +59,8 @@ def parse_bool(value):
 
 def open_text(path):
     if path.endswith(".gz"):
-        return gzip.open(path, "rt", encoding="utf-8", newline="")
-    return open(path, newline="", encoding="utf-8")
+        return gzip.open(path, "rt", encoding="utf-8-sig", newline="")
+    return open(path, newline="", encoding="utf-8-sig")
 
 
 def main():
@@ -69,6 +69,11 @@ def main():
     parser.add_argument("--fastq-dir", required=True)
     parser.add_argument("--min-replicates", type=int, default=2)
     parser.add_argument("--require-diff-replicates", action="store_true")
+    parser.add_argument(
+        "--allow-missing-controls",
+        action="store_true",
+        help="Allow IP samples with empty control_id; peak calling will run without matched input/control.",
+    )
     args = parser.parse_args()
 
     errors = []
@@ -135,7 +140,12 @@ def main():
     for sid, row in ip_rows.items():
         control_id = (row.get("control_id") or "").strip()
         if not control_id:
-            errors.append(f"{sid}: non-control sample must define control_id")
+            if args.allow_missing_controls:
+                warnings.append(
+                    f"{sid}: control_id is empty; peak calling will run without matched input/control"
+                )
+            else:
+                errors.append(f"{sid}: non-control sample must define control_id")
         elif control_id not in sample_set:
             errors.append(f"{sid}: control_id points to unknown sample: {control_id}")
         elif control_id not in control_rows:
