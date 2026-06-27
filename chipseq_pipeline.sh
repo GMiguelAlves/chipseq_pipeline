@@ -337,12 +337,12 @@ submit_job() {
     --export="${config_export}"
     --job-name="chipseq_${step}_${safe_target}"
     --cpus-per-task="${THREADS}"
-    --mem="${MEMORY}"
-    --time="${SLURM_TIME}"
-    --partition="${SLURM_PARTITION}"
     --output="${log_dir}/${safe_target}.out"
     --error="${log_dir}/${safe_target}.err"
   )
+  [[ -z "${MEMORY}" ]] || args+=(--mem="${MEMORY}")
+  [[ -z "${SLURM_TIME}" ]] || args+=(--time="${SLURM_TIME}")
+  [[ -z "${SLURM_PARTITION}" ]] || args+=(--partition="${SLURM_PARTITION}")
   [[ -z "${SLURM_ACCOUNT}" ]] || args+=(--account="${SLURM_ACCOUNT}")
   [[ -z "${SLURM_QOS}" ]] || args+=(--qos="${SLURM_QOS}")
   dep_arg="$(dependency_arg "${deps}")"

@@ -52,7 +52,8 @@ export LOCAL_CPUS_PER_TASK=8      # Used only when PIPELINE_EXECUTOR="local".
 export THREADS=8
 export MEMORY="32G"
 export SLURM_TIME="12:00:00"
-export SLURM_PARTITION="compute"
+# Leave empty unless your cluster requires a partition.
+export SLURM_PARTITION=""
 export SLURM_ACCOUNT=""
 export SLURM_QOS=""
 
