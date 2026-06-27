@@ -253,10 +253,12 @@ activate_runtime() {
         # shellcheck disable=SC1090
         source "${CONDA_BASE}/etc/profile.d/conda.sh"
         conda activate "${CONDA_ENV}"
+        log "Activated Conda environment: ${CONDA_DEFAULT_ENV:-${CONDA_ENV}}"
       elif command -v conda >/dev/null 2>&1; then
         # shellcheck disable=SC1091
         source "$(conda info --base)/etc/profile.d/conda.sh"
         conda activate "${CONDA_ENV}"
+        log "Activated Conda environment: ${CONDA_DEFAULT_ENV:-${CONDA_ENV}}"
       else
         die "Conda not found. Set CONDA_BASE in config/user_settings.sh or use ENV_BACKEND=none."
       fi
@@ -277,7 +279,7 @@ run_cmd() {
       "${ENV_BACKEND}" exec "${CONTAINER_IMAGE}" bash -lc "${cmd}"
       ;;
     *)
-      bash -lc "${cmd}"
+      bash -c "${cmd}"
       ;;
   esac
 }
