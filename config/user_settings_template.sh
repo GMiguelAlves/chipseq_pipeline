@@ -73,7 +73,18 @@ export PROMOTER_DOWNSTREAM=500
 export BIGWIG_NORMALIZATION="CPM"
 export DIFF_CONTRASTS=""          # Example: treated:control,drug:vehicle
 
-# 11) Storage mode.
+# 11) Slurm concurrency for sample-level jobs.
+# These limits avoid submitting/running all samples at once. Increase only if
+# your account and filesystem can handle it.
+export QC_CONCURRENCY=8
+export TRIM_CONCURRENCY=4
+export ALIGN_CONCURRENCY=2
+export FILTER_CONCURRENCY=2
+export BAM_QC_CONCURRENCY=4
+export PEAKS_CONCURRENCY=4
+export TRACKS_CONCURRENCY=4
+
+# 12) Storage mode.
 # full: keep everything. Best for debugging and reruns.
 # balanced: remove temporary uncompressed reference copies and individual
 #           FastQC folders after the final report.

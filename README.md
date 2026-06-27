@@ -124,6 +124,9 @@ Important execution settings:
 
 - `PIPELINE_EXECUTOR=slurm` or `PIPELINE_EXECUTOR=local`
 - `THREADS`, `MEMORY`, `SLURM_TIME`, `SLURM_PARTITION`, `SLURM_ACCOUNT`
+- `QC_CONCURRENCY`, `TRIM_CONCURRENCY`, `ALIGN_CONCURRENCY`,
+  `FILTER_CONCURRENCY`, `BAM_QC_CONCURRENCY`, `PEAKS_CONCURRENCY`,
+  `TRACKS_CONCURRENCY`
 - `ENV_BACKEND=conda`, `none`, or `apptainer`
 - `ALIGNER=bowtie2` or `bwa`
 - `TRIM_TOOL=fastp` or `trim_galore`
@@ -235,9 +238,12 @@ all aggregate outputs -> report
 ```
 
 In Slurm mode, sample-level jobs are submitted independently and downstream
-steps use `--dependency=afterok`. The orchestrator submits jobs in the same
-style as the RNA-seq pipeline, using `sbatch --chdir`, `--export`,
-`--parsable`, and a shared `submit_sbatch` helper.
+steps use `--dependency=afterok`. Sample-level steps are throttled with
+RNA-seq-style concurrency settings. For example, `ALIGN_CONCURRENCY=2` keeps at
+most two alignment jobs eligible at a time; each later alignment depends on an
+earlier alignment finishing successfully. The orchestrator submits jobs using
+`sbatch --chdir`, `--export`, `--parsable`, and a shared `submit_sbatch`
+helper.
 
 ## Outputs
 

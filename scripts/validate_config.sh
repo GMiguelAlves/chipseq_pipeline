@@ -85,6 +85,12 @@ for flag in PIPELINE_COMPRESS_RESULTS RUN_STORAGE_CLEANUP_AFTER_REPORT CLEANUP_F
   esac
 done
 
+for value_name in QC_CONCURRENCY TRIM_CONCURRENCY ALIGN_CONCURRENCY FILTER_CONCURRENCY BAM_QC_CONCURRENCY PEAKS_CONCURRENCY TRACKS_CONCURRENCY; do
+  value="${!value_name:-}"
+  [[ "${value}" =~ ^[1-9][0-9]*$ ]] || die "${value_name} must be a positive integer. Current value: ${value}"
+done
+unset value_name value
+
 if [[ "${ENV_BACKEND}" == "conda" && -z "${CONDA_BASE:-}" ]]; then
   warn "CONDA_BASE is empty. Jobs will try to use conda from PATH."
 fi

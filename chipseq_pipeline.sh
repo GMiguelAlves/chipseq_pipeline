@@ -229,6 +229,18 @@ dependency_arg() {
   return 0
 }
 
+throttle_dep() {
+  local -n submitted_ids="$1"
+  local index="$2"
+  local concurrency="$3"
+  local previous_index
+
+  if (( concurrency > 0 && index >= concurrency )); then
+    previous_index=$((index - concurrency))
+    printf '%s\n' "${submitted_ids[${previous_index}]:-}"
+  fi
+}
+
 export_from_sbatch_spec() {
   local spec="$1"
   local token key value
@@ -349,6 +361,9 @@ submit_job() {
   [[ -z "${dep_arg}" ]] || args+=("${dep_arg}")
 
   submit_or_print "${args[@]}" "${script}" "${CONFIG_FILE}" "$@"
+  if [[ "${DRY_RUN}" == "true" && "${PIPELINE_EXECUTOR}" == "slurm" ]]; then
+    SUBMITTED_JOB_ID="dryrun_${step}_${safe_target}"
+  fi
   log "Step ${step}/${target}: ${SUBMITTED_JOB_ID}"
 }
 
@@ -356,6 +371,7 @@ log "Pipeline: ${PIPELINE_NAME}"
 log "Organism: ${ORGANISM_NAME}"
 log "Executor: ${PIPELINE_EXECUTOR}"
 log "Samples: $(metadata_samples | tr '\n' ' ')"
+log "Sample job concurrency: qc=${QC_CONCURRENCY}, trim=${TRIM_CONCURRENCY}, align=${ALIGN_CONCURRENCY}, filter=${FILTER_CONCURRENCY}, bam_qc=${BAM_QC_CONCURRENCY}, peaks=${PEAKS_CONCURRENCY}, tracks=${TRACKS_CONCURRENCY}"
 
 mapfile -t SAMPLES < <(metadata_samples)
 mapfile -t IP_SAMPLES < <(metadata_ip_samples)
@@ -379,49 +395,74 @@ if has_step reference; then
 fi
 
 if has_step qc; then
+  declare -a QC_ORDER=()
+  idx=0
   for sample in "${SAMPLES[@]}"; do
-    submit_job "qc" "${sample}" "" "${QC_SCRIPTS_DIR}/fastq_qc.sh" "${sample}"
+    dep="$(throttle_dep QC_ORDER "${idx}" "${QC_CONCURRENCY}")"
+    submit_job "qc" "${sample}" "${dep}" "${QC_SCRIPTS_DIR}/fastq_qc.sh" "${sample}"
     JOB_QC["${sample}"]="${SUBMITTED_JOB_ID}"
+    QC_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
   submit_job "qc" "raw_multiqc" "$(join_deps "${JOB_QC[@]}")" "${QC_SCRIPTS_DIR}/fastq_qc.sh" "raw_multiqc"
   QC_MULTIQC_JOB="${SUBMITTED_JOB_ID}"
 fi
 
 if has_step trim; then
+  declare -a TRIM_ORDER=()
+  idx=0
   for sample in "${SAMPLES[@]}"; do
     dep=""
     [[ "${RUN_ALL}" == "true" ]] && dep="${JOB_QC[${sample}]:-}"
+    dep="$(join_deps "${dep}" "$(throttle_dep TRIM_ORDER "${idx}" "${TRIM_CONCURRENCY}")")"
     submit_job "trim" "${sample}" "${dep}" "${TRIM_SCRIPTS_DIR}/trim.sh" "${sample}"
     JOB_TRIM["${sample}"]="${SUBMITTED_JOB_ID}"
+    TRIM_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
   submit_job "trim" "post_trim_multiqc" "$(join_deps "${JOB_TRIM[@]}")" "${QC_SCRIPTS_DIR}/fastq_qc.sh" "post_trim_multiqc"
   TRIM_MULTIQC_JOB="${SUBMITTED_JOB_ID}"
 fi
 
 if has_step align; then
+  declare -a ALIGN_ORDER=()
+  idx=0
   for sample in "${SAMPLES[@]}"; do
     dep=""
     [[ "${RUN_ALL}" == "true" ]] && dep="$(join_deps "${JOB_TRIM[${sample}]:-}" "${REF_JOB}")"
+    dep="$(join_deps "${dep}" "$(throttle_dep ALIGN_ORDER "${idx}" "${ALIGN_CONCURRENCY}")")"
     submit_job "align" "${sample}" "${dep}" "${ALIGN_SCRIPTS_DIR}/align.sh" "${sample}"
     JOB_ALIGN["${sample}"]="${SUBMITTED_JOB_ID}"
+    ALIGN_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
 fi
 
 if has_step filter; then
+  declare -a FILTER_ORDER=()
+  idx=0
   for sample in "${SAMPLES[@]}"; do
     dep=""
     [[ "${RUN_ALL}" == "true" ]] && dep="${JOB_ALIGN[${sample}]:-}"
+    dep="$(join_deps "${dep}" "$(throttle_dep FILTER_ORDER "${idx}" "${FILTER_CONCURRENCY}")")"
     submit_job "filter" "${sample}" "${dep}" "${FILTER_SCRIPTS_DIR}/filter.sh" "${sample}"
     JOB_FILTER["${sample}"]="${SUBMITTED_JOB_ID}"
+    FILTER_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
 fi
 
 if has_step bam_qc; then
+  declare -a BAM_QC_ORDER=()
+  idx=0
   for sample in "${SAMPLES[@]}"; do
     dep=""
     [[ "${RUN_ALL}" == "true" ]] && dep="${JOB_FILTER[${sample}]:-}"
+    dep="$(join_deps "${dep}" "$(throttle_dep BAM_QC_ORDER "${idx}" "${BAM_QC_CONCURRENCY}")")"
     submit_job "bam_qc" "${sample}" "${dep}" "${BAM_QC_SCRIPTS_DIR}/bam_qc.sh" "${sample}"
     JOB_BAMQC["${sample}"]="${SUBMITTED_JOB_ID}"
+    BAM_QC_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
   submit_job "bam_qc" "fingerprint" "$(join_deps "${JOB_BAMQC[@]}")" "${BAM_QC_SCRIPTS_DIR}/bam_qc.sh" "fingerprint"
   FINGERPRINT_JOB="${SUBMITTED_JOB_ID}"
@@ -430,6 +471,8 @@ if has_step bam_qc; then
 fi
 
 if has_step peaks; then
+  declare -a PEAK_ORDER=()
+  idx=0
   for sample in "${IP_SAMPLES[@]}"; do
     dep=""
     if [[ "${RUN_ALL}" == "true" ]]; then
@@ -440,8 +483,11 @@ if has_step peaks; then
         dep="$(join_deps "${JOB_FILTER[${sample}]:-}")"
       fi
     fi
+    dep="$(join_deps "${dep}" "$(throttle_dep PEAK_ORDER "${idx}" "${PEAKS_CONCURRENCY}")")"
     submit_job "peaks" "${sample}" "${dep}" "${PEAK_SCRIPTS_DIR}/call_peaks.sh" "${sample}"
     JOB_PEAK["${sample}"]="${SUBMITTED_JOB_ID}"
+    PEAK_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
 fi
 
@@ -467,11 +513,16 @@ if has_step annotate; then
 fi
 
 if has_step tracks; then
+  declare -a TRACK_ORDER=()
+  idx=0
   for sample in "${SAMPLES[@]}"; do
     dep=""
     [[ "${RUN_ALL}" == "true" ]] && dep="${JOB_FILTER[${sample}]:-}"
+    dep="$(join_deps "${dep}" "$(throttle_dep TRACK_ORDER "${idx}" "${TRACKS_CONCURRENCY}")")"
     submit_job "tracks" "${sample}" "${dep}" "${TRACK_SCRIPTS_DIR}/tracks.sh" "${sample}"
     JOB_TRACK["${sample}"]="${SUBMITTED_JOB_ID}"
+    TRACK_ORDER+=("${SUBMITTED_JOB_ID}")
+    idx=$((idx + 1))
   done
   submit_job "tracks" "aggregate" "$(join_deps "${JOB_TRACK[@]}")" "${TRACK_SCRIPTS_DIR}/tracks.sh" "aggregate"
   TRACK_AGG_JOB="${SUBMITTED_JOB_ID}"
