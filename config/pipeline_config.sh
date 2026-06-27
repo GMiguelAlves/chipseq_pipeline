@@ -58,6 +58,23 @@ normalize_project_path_var() {
   export "${var_name}=$(resolve_path_from_dir "$PROJECT_DIR" "$value")"
 }
 
+source_optional_settings() {
+  local settings_file="$1"
+  local had_nounset=0
+  [[ -f "${settings_file}" ]] || return 0
+  case "$-" in
+    *u*)
+      had_nounset=1
+      set +u
+      ;;
+  esac
+  # shellcheck source=/dev/null
+  source "${settings_file}"
+  if [[ "${had_nounset}" -eq 1 ]]; then
+    set -u
+  fi
+}
+
 # Simple user settings. This optional file is the only file most users edit.
 export USER_SETTINGS_FILE="${USER_SETTINGS_FILE:-${PROJECT_DIR}/config/user_settings.sh}"
 if ! path_is_absolute "$USER_SETTINGS_FILE"; then
@@ -65,15 +82,13 @@ if ! path_is_absolute "$USER_SETTINGS_FILE"; then
 fi
 export USER_SETTINGS_DIR="$(cd "$(dirname "$USER_SETTINGS_FILE")" 2>/dev/null && pwd || echo "${PROJECT_DIR}/config")"
 if [[ -f "$USER_SETTINGS_FILE" ]]; then
-  # shellcheck source=/dev/null
-  source "$USER_SETTINGS_FILE"
+  source_optional_settings "$USER_SETTINGS_FILE"
 fi
 
 # Backward-compatible local config name from earlier versions.
 export LOCAL_CONFIG="${LOCAL_CONFIG:-${PROJECT_DIR}/config/pipeline_config.local.sh}"
 if [[ ! -f "$USER_SETTINGS_FILE" && -f "$LOCAL_CONFIG" ]]; then
-  # shellcheck source=/dev/null
-  source "$LOCAL_CONFIG"
+  source_optional_settings "$LOCAL_CONFIG"
 fi
 
 if [[ -n "${CONDA_BASE:-}" ]]; then

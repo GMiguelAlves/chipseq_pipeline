@@ -64,10 +64,10 @@ export SLURM_QOS=""
 
 # 9) Conda environment names. Change only if your server uses other names.
 export ENV_BACKEND="conda"
-export CHIPSEQ_TOOLS_ENV="chipseq"
-export PYTHON_ENV="chipseq"
-export R_ANALYSIS_ENV="chipseq"
-export CONDA_ENV="${CHIPSEQ_TOOLS_ENV}"
+export CONDA_ENV="chipseq"
+export CHIPSEQ_TOOLS_ENV="${CONDA_ENV}"
+export PYTHON_ENV="${CONDA_ENV}"
+export R_ANALYSIS_ENV="${CONDA_ENV}"
 
 # 10) ChIP-seq parameters.
 export READ_LAYOUT="metadata"     # metadata, paired, or single
