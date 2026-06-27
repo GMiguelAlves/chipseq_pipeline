@@ -22,7 +22,7 @@ fi
 if command -v "${RSCRIPT_BIN}" >/dev/null 2>&1; then
   "${RSCRIPT_BIN}" "${SCRIPT_DIR}/r/render_report.R" \
     --metadata "${METADATA_FILE}" \
-    --output-dir "${OUTPUT_DIR}" \
+    --output-dir "${WORK_ROOT:-${OUTPUT_DIR}}" \
     --report "${STEP_DIR}/chipseq_report.md"
 else
   {
@@ -30,7 +30,7 @@ else
     echo
     echo "Rscript was not available, so only a minimal report was generated."
     echo
-    echo "Generated files are under: ${OUTPUT_DIR}"
+    echo "Generated files are under: ${WORK_ROOT:-${OUTPUT_DIR}}"
   } > "${STEP_DIR}/chipseq_report.md"
 fi
 

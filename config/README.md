@@ -24,6 +24,9 @@ Useful settings in `config/user_settings.sh`:
 
 - `PIPELINE_EXECUTOR`: use `slurm` or `local`
 - `CONDA_BASE`: path to Conda on the HPC server
+- `OUTPUT_DIR`: light project outputs such as logs, copied configs, and reports
+- `WORK_ROOT`: heavy outputs on scratch, including indexes, trimmed FASTQs,
+  BAMs, peaks, tracks, and count matrices
 - `PIPELINE_COMPRESS_RESULTS`: use `1` to write large TSV-like outputs as
   `.tsv.gz`; downstream steps read `.tsv` and `.tsv.gz`
 - `PIPELINE_STORAGE_MODE`: use `full`, `balanced`, or `minimal` to control

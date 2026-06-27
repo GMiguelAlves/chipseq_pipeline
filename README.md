@@ -109,6 +109,7 @@ Required organism-specific inputs:
 - `GENOME_FASTA`
 - `ANNOTATION_FILE`
 - `METADATA_FILE`
+- `WORK_ROOT` for large outputs on scratch, if different from the repository
 
 `GENOME_FASTA` and `ANNOTATION_FILE` may be plain files or gzip files such as
 `.fa.gz`, `.gtf.gz`, or `.gff3.gz`. Gzipped references are decompressed into
@@ -122,6 +123,9 @@ Optional inputs:
 
 Important execution settings:
 
+- `OUTPUT_DIR`: light project outputs such as logs, copied config/metadata, and reports
+- `WORK_ROOT`: heavy work/results such as indexed references, QC outputs,
+  trimmed FASTQs, BAMs, peaks, tracks, and matrices
 - `PIPELINE_EXECUTOR=slurm` or `PIPELINE_EXECUTOR=local`
 - `THREADS`, `MEMORY`, `SLURM_TIME`, `SLURM_PARTITION`, `SLURM_ACCOUNT`
 - `QC_CONCURRENCY`, `TRIM_CONCURRENCY`, `ALIGN_CONCURRENCY`,
@@ -249,17 +253,17 @@ helper.
 
 Key files:
 
-- `010-reference/chrom.sizes`
-- `010-reference/annotation/{genes,exons,introns,promoters,downstream}.bed`
-- `050-alignment/<sample>/<sample>.sorted.bam`
-- `060-filtering/<sample>/<sample>.filtered.bam`
-- `080-peak-calling/<sample>/*_peaks.narrowPeak` or `*_peaks.broadPeak`
-- `110-consensus-peaks/groups/*.consensus.bed`
-- `110-consensus-peaks/counts/*.counts.tsv.gz`
-- `090-peak-annotation/*.annotated.tsv.gz`
-- `100-tracks/*.bw`
-- `120-differential-binding/differential_binding_results.tsv.gz`
-- `130-reports/chipseq_report.md`
+- `${WORK_ROOT}/010-reference/chrom.sizes`
+- `${WORK_ROOT}/010-reference/annotation/{genes,exons,introns,promoters,downstream}.bed`
+- `${WORK_ROOT}/050-alignment/<sample>/<sample>.sorted.bam`
+- `${WORK_ROOT}/060-filtering/<sample>/<sample>.filtered.bam`
+- `${WORK_ROOT}/080-peak-calling/<sample>/*_peaks.narrowPeak` or `*_peaks.broadPeak`
+- `${WORK_ROOT}/110-consensus-peaks/groups/*.consensus.bed`
+- `${WORK_ROOT}/110-consensus-peaks/counts/*.counts.tsv.gz`
+- `${WORK_ROOT}/090-peak-annotation/*.annotated.tsv.gz`
+- `${WORK_ROOT}/100-tracks/*.bw`
+- `${WORK_ROOT}/120-differential-binding/differential_binding_results.tsv.gz`
+- `${OUTPUT_DIR}/130-reports/chipseq_report.md`
 
 When `PIPELINE_COMPRESS_RESULTS=0`, TSV-like outputs use plain `.tsv`.
 

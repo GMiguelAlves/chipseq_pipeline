@@ -96,29 +96,33 @@ esac
 export FASTQ_DIR="${FASTQ_DIR:-${PROJECT_DIR}/data/fastq}"
 export REFERENCE_DIR="${REFERENCE_DIR:-${PROJECT_DIR}/reference}"
 export OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_DIR}}"
+export WORK_ROOT="${WORK_ROOT:-${OUTPUT_DIR}}"
 export METADATA_FILE="${METADATA_FILE:-${PROJECT_DIR}/config/metadata.tsv}"
 export ENVS_DIR="${ENVS_DIR:-${PROJECT_DIR}/envs}"
 export SCRIPTS_DIR="${SCRIPTS_DIR:-${PROJECT_DIR}/scripts}"
 
-for path_var in FASTQ_DIR REFERENCE_DIR OUTPUT_DIR METADATA_FILE ENVS_DIR SCRIPTS_DIR; do
+for path_var in FASTQ_DIR REFERENCE_DIR OUTPUT_DIR WORK_ROOT METADATA_FILE ENVS_DIR SCRIPTS_DIR; do
   normalize_project_path_var "$path_var"
 done
 unset path_var
 
 export LOG_DIR="${LOG_DIR:-${OUTPUT_DIR}/000-logs}"
-export REF_DIR="${REF_DIR:-${OUTPUT_DIR}/010-reference}"
 export METADATA_DIR="${METADATA_DIR:-${OUTPUT_DIR}/020-metadata}"
-export QC_DIR="${QC_DIR:-${OUTPUT_DIR}/030-qc-fastq}"
-export TRIM_DIR="${TRIM_DIR:-${OUTPUT_DIR}/040-trimming}"
-export ALIGN_DIR="${ALIGN_DIR:-${OUTPUT_DIR}/050-alignment}"
-export FILTER_DIR="${FILTER_DIR:-${OUTPUT_DIR}/060-filtering}"
-export BAM_QC_DIR="${BAM_QC_DIR:-${OUTPUT_DIR}/070-qc-alignment}"
-export PEAK_DIR="${PEAK_DIR:-${OUTPUT_DIR}/080-peak-calling}"
-export ANNOTATION_DIR="${ANNOTATION_DIR:-${OUTPUT_DIR}/090-peak-annotation}"
-export TRACK_DIR="${TRACK_DIR:-${OUTPUT_DIR}/100-tracks}"
-export CONSENSUS_DIR="${CONSENSUS_DIR:-${OUTPUT_DIR}/110-consensus-peaks}"
-export DIFF_DIR="${DIFF_DIR:-${OUTPUT_DIR}/120-differential-binding}"
 export REPORT_DIR="${REPORT_DIR:-${OUTPUT_DIR}/130-reports}"
+
+# Heavy work/result directories. Set WORK_ROOT to scratch to keep large files
+# away from the cloned repository while preserving logs/reports in OUTPUT_DIR.
+export REF_DIR="${REF_DIR:-${WORK_ROOT}/010-reference}"
+export QC_DIR="${QC_DIR:-${WORK_ROOT}/030-qc-fastq}"
+export TRIM_DIR="${TRIM_DIR:-${WORK_ROOT}/040-trimming}"
+export ALIGN_DIR="${ALIGN_DIR:-${WORK_ROOT}/050-alignment}"
+export FILTER_DIR="${FILTER_DIR:-${WORK_ROOT}/060-filtering}"
+export BAM_QC_DIR="${BAM_QC_DIR:-${WORK_ROOT}/070-qc-alignment}"
+export PEAK_DIR="${PEAK_DIR:-${WORK_ROOT}/080-peak-calling}"
+export ANNOTATION_DIR="${ANNOTATION_DIR:-${WORK_ROOT}/090-peak-annotation}"
+export TRACK_DIR="${TRACK_DIR:-${WORK_ROOT}/100-tracks}"
+export CONSENSUS_DIR="${CONSENSUS_DIR:-${WORK_ROOT}/110-consensus-peaks}"
+export DIFF_DIR="${DIFF_DIR:-${WORK_ROOT}/120-differential-binding}"
 export REF_DATA_DIR="${REF_DATA_DIR:-${REF_DIR}/data}"
 
 for path_var in LOG_DIR REF_DIR METADATA_DIR QC_DIR TRIM_DIR ALIGN_DIR FILTER_DIR BAM_QC_DIR PEAK_DIR ANNOTATION_DIR TRACK_DIR CONSENSUS_DIR DIFF_DIR REPORT_DIR REF_DATA_DIR; do

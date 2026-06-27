@@ -23,8 +23,13 @@ export EFFECTIVE_GENOME_SIZES=""
 export FUNCTIONAL_ANNOTATION=""
 
 # 4) Choose where outputs are written.
-# Keeping OUTPUT_DIR as PROJECT_DIR reproduces the numbered directory layout.
+# OUTPUT_DIR is for light project outputs such as logs, copied configs, and reports.
+# WORK_ROOT is for large work/results such as indexes, trimmed FASTQs, BAMs,
+# peaks, tracks, and matrices. Keep WORK_ROOT on scratch for real analyses.
 export OUTPUT_DIR="${PROJECT_DIR}"
+export WORK_ROOT="${PROJECT_DIR}"
+# Example for HPC:
+# export WORK_ROOT="/scratch/my_user/chipseq_project"
 
 # Large TSV-like results are written as .tsv.gz by default, like the RNA-seq
 # pipeline. Set this to 0 only if you need plain text tables.
