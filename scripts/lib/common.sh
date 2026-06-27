@@ -279,7 +279,7 @@ run_cmd() {
       "${ENV_BACKEND}" exec "${CONTAINER_IMAGE}" bash -lc "${cmd}"
       ;;
     *)
-      bash -c "${cmd}"
+      bash -o pipefail -c "${cmd}"
       ;;
   esac
 }

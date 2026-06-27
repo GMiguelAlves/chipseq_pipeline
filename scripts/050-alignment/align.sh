@@ -41,13 +41,26 @@ fi
 BAM="${STEP_DIR}/${SAMPLE_ID}.sorted.bam"
 LOG="${STEP_DIR}/${SAMPLE_ID}.${ALIGNER}.log"
 
+run_alignment_cmd() {
+  local cmd="$1"
+  if ! run_cmd "${cmd}"; then
+    warn "${SAMPLE_ID}: ${ALIGNER} alignment failed. Last lines from ${LOG}:"
+    if [[ -s "${LOG}" ]]; then
+      tail -n 80 "${LOG}" >&2 || true
+    else
+      warn "${SAMPLE_ID}: aligner log is empty or missing: ${LOG}"
+    fi
+    return 1
+  fi
+}
+
 case "${ALIGNER}" in
   bowtie2)
     require_cmd bowtie2
     if [[ "${LAYOUT}" == "paired" ]]; then
-      run_cmd "bowtie2 -p ${THREADS} ${BOWTIE2_OPTS} -x '${BOWTIE2_INDEX_PREFIX}' -1 '${FQ1}' -2 '${FQ2}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
+      run_alignment_cmd "bowtie2 -p ${THREADS} ${BOWTIE2_OPTS} -x '${BOWTIE2_INDEX_PREFIX}' -1 '${FQ1}' -2 '${FQ2}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
     else
-      run_cmd "bowtie2 -p ${THREADS} ${BOWTIE2_OPTS} -x '${BOWTIE2_INDEX_PREFIX}' -U '${FQ1}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
+      run_alignment_cmd "bowtie2 -p ${THREADS} ${BOWTIE2_OPTS} -x '${BOWTIE2_INDEX_PREFIX}' -U '${FQ1}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
     fi
     ;;
   bwa)
@@ -56,9 +69,9 @@ case "${ALIGNER}" in
       BWA_INDEX_PREFIX="${REF_DATA_DIR:-${REF_DIR}/data}/$(basename "${GENOME_FASTA%.gz}")"
     fi
     if [[ "${LAYOUT}" == "paired" ]]; then
-      run_cmd "bwa mem -t ${THREADS} ${BWA_OPTS} '${BWA_INDEX_PREFIX}' '${FQ1}' '${FQ2}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
+      run_alignment_cmd "bwa mem -t ${THREADS} ${BWA_OPTS} '${BWA_INDEX_PREFIX}' '${FQ1}' '${FQ2}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
     else
-      run_cmd "bwa mem -t ${THREADS} ${BWA_OPTS} '${BWA_INDEX_PREFIX}' '${FQ1}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
+      run_alignment_cmd "bwa mem -t ${THREADS} ${BWA_OPTS} '${BWA_INDEX_PREFIX}' '${FQ1}' 2> '${LOG}' | samtools sort -@ ${THREADS} -o '${BAM}' -"
     fi
     ;;
 esac
