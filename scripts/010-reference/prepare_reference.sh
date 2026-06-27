@@ -3,7 +3,8 @@
 set -euo pipefail
 
 CONFIG_FILE="${1:-config/pipeline_config.sh}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "${CONFIG_FILE}")/.." && pwd)}"
+SCRIPT_DIR="${PROJECT_DIR}/scripts"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 load_config "${CONFIG_FILE}"
