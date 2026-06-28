@@ -223,9 +223,43 @@ join_deps() {
 }
 
 dependency_arg() {
-  local deps
+  local deps dep spec afterok_deps afterany_deps
+  local -a dep_tokens=()
   deps="$(join_deps "$@")"
-  [[ -n "${deps}" ]] && printf '%s\n' "--dependency=afterok:${deps}"
+  [[ -n "${deps}" ]] || return 0
+
+  afterok_deps=""
+  afterany_deps=""
+  IFS=':' read -r -a dep_tokens <<< "${deps}"
+  for dep in "${dep_tokens[@]}"; do
+    [[ -n "${dep}" && "${dep}" != "dryrun" && "${dep}" != "local" ]] || continue
+    if [[ "${dep}" == afterany__* ]]; then
+      dep="${dep#afterany__}"
+      [[ -n "${dep}" ]] || continue
+      if [[ -z "${afterany_deps}" ]]; then
+        afterany_deps="${dep}"
+      else
+        afterany_deps="${afterany_deps}:${dep}"
+      fi
+    else
+      if [[ -z "${afterok_deps}" ]]; then
+        afterok_deps="${dep}"
+      else
+        afterok_deps="${afterok_deps}:${dep}"
+      fi
+    fi
+  done
+
+  spec=""
+  [[ -z "${afterok_deps}" ]] || spec="afterok:${afterok_deps}"
+  if [[ -n "${afterany_deps}" ]]; then
+    if [[ -n "${spec}" ]]; then
+      spec="${spec},afterany:${afterany_deps}"
+    else
+      spec="afterany:${afterany_deps}"
+    fi
+  fi
+  [[ -n "${spec}" ]] && printf '%s\n' "--dependency=${spec}"
   return 0
 }
 
@@ -237,7 +271,9 @@ throttle_dep() {
 
   if (( concurrency > 0 && index >= concurrency )); then
     previous_index=$((index - concurrency))
-    printf '%s\n' "${submitted_ids[${previous_index}]:-}"
+    if [[ -n "${submitted_ids[${previous_index}]:-}" ]]; then
+      printf 'afterany__%s\n' "${submitted_ids[${previous_index}]}"
+    fi
   fi
 }
 
