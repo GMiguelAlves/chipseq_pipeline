@@ -6,9 +6,13 @@ parse_args <- function() {
   i <- 1
   while (i <= length(args)) {
     key <- sub("^--", "", args[[i]])
-    value <- args[[i + 1]]
+    value <- ""
+    if (i + 1 <= length(args) && !grepl("^--", args[[i + 1]])) {
+      value <- args[[i + 1]]
+      i <- i + 1
+    }
     out[[key]] <- value
-    i <- i + 2
+    i <- i + 1
   }
   out
 }
@@ -191,7 +195,8 @@ markdown_table <- function(x, con, max_rows = Inf) {
 
 summarise_diff <- function(diff_results) {
   if (nrow(diff_results) == 0) {
-    return(list(overall = data.frame(), by_contrast = data.frame(), by_method = data.frame()))
+    return(list(overall = data.frame(), by_contrast = data.frame(), by_method = data.frame(),
+                by_mark = data.frame(), by_peak_set = data.frame(), by_peak_set_contrast = data.frame()))
   }
   padj <- if ("padj" %in% names(diff_results)) suppressWarnings(as.numeric(diff_results$padj)) else rep(NA_real_, nrow(diff_results))
   pvalue <- if ("pvalue" %in% names(diff_results)) suppressWarnings(as.numeric(diff_results$pvalue)) else rep(NA_real_, nrow(diff_results))
@@ -219,13 +224,31 @@ summarise_diff <- function(diff_results) {
   } else {
     by_contrast <- data.frame()
   }
+  summarise_by <- function(cols) {
+    if (!all(cols %in% names(diff_results))) return(data.frame())
+    key <- interaction(diff_results[, cols, drop = FALSE], drop = TRUE, sep = "\r")
+    out <- do.call(rbind, lapply(split(seq_len(nrow(diff_results)), key), function(idx) {
+      p <- padj[idx]
+      row <- as.data.frame(as.list(diff_results[idx[[1]], cols, drop = FALSE]), stringsAsFactors = FALSE)
+      row$tested_rows <- length(idx)
+      row$rows_with_padj <- sum(!is.na(p))
+      row$significant_padj_0_05 <- sum(p < 0.05, na.rm = TRUE)
+      row$significant_padj_0_10 <- sum(p < 0.10, na.rm = TRUE)
+      row
+    }))
+    out[order(out$significant_padj_0_05, decreasing = TRUE), , drop = FALSE]
+  }
+  by_mark <- summarise_by(c("mark_or_factor"))
+  by_peak_set <- summarise_by(c("peak_set", "mark_or_factor"))
+  by_peak_set_contrast <- summarise_by(c("peak_set", "mark_or_factor", "contrast"))
   if ("method" %in% names(diff_results)) {
     by_method <- as.data.frame(table(diff_results$method), stringsAsFactors = FALSE)
     names(by_method) <- c("method", "rows")
   } else {
     by_method <- data.frame()
   }
-  list(overall = overall, by_contrast = by_contrast, by_method = by_method)
+  list(overall = overall, by_contrast = by_contrast, by_method = by_method,
+       by_mark = by_mark, by_peak_set = by_peak_set, by_peak_set_contrast = by_peak_set_contrast)
 }
 
 args <- parse_args()
@@ -368,6 +391,9 @@ low_trim <- sample_summary$sample_id[!is.na(sample_summary$trim_retained_pct) & 
 if (length(low_trim) > 0) {
   recommendations <- c(recommendations, paste("Inspect samples with low read retention after trimming:", paste(low_trim, collapse = ", ")))
 }
+if (all(is.na(sample_summary$raw_reads_fastp)) && any(!is.na(sample_summary$aligner_input_reads))) {
+  recommendations <- c(recommendations, "fastp JSON reports were not found, so raw/trimming read counts are unavailable; use aligner_input_reads as the available read-input proxy.")
+}
 zero_peaks <- sample_summary$sample_id[!is.na(sample_summary$peak_count) & sample_summary$peak_count == 0 & !sample_summary$is_control]
 if (length(zero_peaks) > 0) {
   recommendations <- c(recommendations, paste("No peaks detected for:", paste(zero_peaks, collapse = ", ")))
@@ -383,6 +409,9 @@ if (nrow(group_summary) > 0 && any(group_summary$ip_replicates < 2)) {
 if (nrow(diff_summary$overall) > 0 && diff_summary$overall$rows_with_padj[[1]] == 0) {
   recommendations <- c(recommendations, "Differential tables do not contain adjusted p-values. Check whether DESeq2 was available or whether fallback mode was used.")
 }
+if (nrow(diff_results) > 0 && !all(c("peak_set", "mark_or_factor") %in% names(diff_results))) {
+  recommendations <- c(recommendations, "Differential results do not contain peak_set/mark_or_factor columns. Regenerate the differential step with the updated pipeline.")
+}
 if (length(recommendations) == 0) {
   recommendations <- "No automatic quality warnings were triggered."
 }
@@ -390,9 +419,11 @@ if (length(recommendations) == 0) {
 sample_summary_file <- file.path(report_dir, paste0("chipseq_sample_qc_summary.tsv", table_suffix))
 group_summary_file <- file.path(report_dir, paste0("chipseq_group_summary.tsv", table_suffix))
 diff_summary_file <- file.path(report_dir, paste0("chipseq_differential_summary.tsv", table_suffix))
+diff_peak_set_file <- file.path(report_dir, paste0("chipseq_differential_by_peak_set.tsv", table_suffix))
 write_tsv_safe(sample_summary, sample_summary_file)
 write_tsv_safe(group_summary, group_summary_file)
 if (nrow(diff_summary$by_contrast) > 0) write_tsv_safe(diff_summary$by_contrast, diff_summary_file)
+if (nrow(diff_summary$by_peak_set_contrast) > 0) write_tsv_safe(diff_summary$by_peak_set_contrast, diff_peak_set_file)
 
 con <- file(report, open = "w", encoding = "UTF-8")
 on.exit(close(con), add = TRUE)
@@ -425,7 +456,7 @@ markdown_table(group_summary, con, max_rows = 100)
 
 writeLines(c("", "## Sample QC summary", ""), con)
 sample_display <- sample_summary[, c("sample_id", "condition", "mark_or_factor", "is_control", "raw_reads_fastp",
-                                     "trimmed_reads_fastp", "trim_retained_pct", "aligner_overall_alignment_pct",
+                                     "trimmed_reads_fastp", "trim_retained_pct", "aligner_input_reads", "aligner_overall_alignment_pct",
                                      "aligned_bam_reads", "aligned_bam_mapped_pct", "final_filtered_reads",
                                      "peak_type", "peak_count"), drop = FALSE]
 sample_display$trim_retained_pct <- percent(sample_display$trim_retained_pct)
@@ -467,10 +498,21 @@ if (nrow(diff_summary$overall) > 0) {
     writeLines(c("", "Methods used:"), con)
     markdown_table(diff_summary$by_method, con)
   }
+  if (nrow(diff_summary$by_mark) > 0) {
+    writeLines(c("", "Differential summary by mark/factor:"), con)
+    markdown_table(diff_summary$by_mark, con, max_rows = 50)
+  }
+  if (nrow(diff_summary$by_peak_set) > 0) {
+    writeLines(c("", "Differential summary by peak set:"), con)
+    markdown_table(diff_summary$by_peak_set, con, max_rows = 50)
+  }
   if (nrow(diff_summary$by_contrast) > 0) {
     writeLines(c("", "Differential summary by contrast:"), con)
     markdown_table(diff_summary$by_contrast, con, max_rows = 50)
     writeLines(paste0("\nFull differential summary: `", basename(diff_summary_file), "`"), con)
+  }
+  if (nrow(diff_summary$by_peak_set_contrast) > 0) {
+    writeLines(paste0("Full differential summary by peak set and contrast: `", basename(diff_peak_set_file), "`"), con)
   }
 } else {
   writeLines("No differential binding results were generated.", con)

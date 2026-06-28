@@ -238,6 +238,7 @@ export GROUP_COLUMNS="${GROUP_COLUMNS:-condition,mark_or_factor}"
 export DIFF_CONTRASTS="${DIFF_CONTRASTS:-}"        # Example: treated:control,drug:vehicle
 export MIN_REPLICATES_DIFF="${MIN_REPLICATES_DIFF:-2}"
 export REQUIRE_DIFF_REPLICATES="${REQUIRE_DIFF_REPLICATES:-false}"
+export DIFF_PEAK_SET_SCOPE="${DIFF_PEAK_SET_SCOPE:-mark_all}" # mark_all or all
 
 # Slurm concurrency for sample-level steps. This mimics RNA-seq-style
 # --array=1-N%CONCURRENCY throttling while keeping separate sample logs.

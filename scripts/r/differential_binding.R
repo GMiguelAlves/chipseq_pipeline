@@ -6,9 +6,13 @@ parse_args <- function() {
   i <- 1
   while (i <= length(args)) {
     key <- sub("^--", "", args[[i]])
-    value <- args[[i + 1]]
+    value <- ""
+    if (i + 1 <= length(args) && !grepl("^--", args[[i + 1]])) {
+      value <- args[[i + 1]]
+      i <- i + 1
+    }
     out[[key]] <- value
-    i <- i + 2
+    i <- i + 1
   }
   out
 }
@@ -65,6 +69,23 @@ plot_basic_qc <- function(counts, sample_info, out_prefix) {
   }
 }
 
+peak_set_from_count_file <- function(path) {
+  name <- basename(path)
+  name <- sub("\\.gz$", "", name)
+  sub("\\.counts\\.tsv$", "", name)
+}
+
+infer_peak_set_info <- function(peak_set) {
+  if (grepl("__all$", peak_set)) {
+    return(list(scope = "mark_all", condition = NA_character_, mark_or_factor = sub("__all$", "", peak_set)))
+  }
+  if (grepl("__", peak_set, fixed = TRUE)) {
+    parts <- strsplit(peak_set, "__", fixed = TRUE)[[1]]
+    return(list(scope = "condition_mark", condition = parts[[1]], mark_or_factor = paste(parts[-1], collapse = "__")))
+  }
+  list(scope = "unknown", condition = NA_character_, mark_or_factor = peak_set)
+}
+
 fallback_contrast <- function(counts, sample_info, a, b) {
   group_a <- sample_info$sample_id[sample_info$condition == a]
   group_b <- sample_info$sample_id[sample_info$condition == b]
@@ -101,6 +122,14 @@ run_deseq2 <- function(counts, sample_info, pairs) {
   do.call(rbind, out)
 }
 
+add_peak_set_metadata <- function(res, peak_set, mark_or_factor, count_file) {
+  if (nrow(res) == 0) return(res)
+  res$peak_set <- peak_set
+  res$mark_or_factor <- mark_or_factor
+  res$count_file <- basename(count_file)
+  res[, intersect(c("peak_set", "mark_or_factor", "peak_id", "baseMean", "log2FC", "pvalue", "padj", "contrast", "method", "count_file"), names(res))]
+}
+
 plot_contrast <- function(res, out_prefix) {
   if (nrow(res) == 0) return(invisible(NULL))
   pdf(paste0(out_prefix, ".ma.pdf"))
@@ -122,6 +151,7 @@ if (length(missing) > 0) stop("Missing required argument(s): ", paste(missing, c
 
 dir.create(args[["outdir"]], recursive = TRUE, showWarnings = FALSE)
 table_suffix <- if (!is.null(args[["table-suffix"]])) args[["table-suffix"]] else Sys.getenv("PIPELINE_TABLE_SUFFIX", unset = "")
+peak_set_scope <- if (!is.null(args[["peak-set-scope"]]) && nzchar(args[["peak-set-scope"]])) args[["peak-set-scope"]] else "mark_all"
 metadata <- read_metadata(args[["metadata"]])
 ip_metadata <- metadata[!metadata$is_control_norm, , drop = FALSE]
 sample_order <- ip_metadata$sample_id
@@ -134,12 +164,47 @@ if (length(count_files) == 0) {
 }
 
 all_results <- list()
+summary_rows <- list()
 for (count_file in count_files) {
+  peak_set <- peak_set_from_count_file(count_file)
+  peak_info <- infer_peak_set_info(peak_set)
+
+  if (peak_set_scope == "mark_all" && peak_info$scope != "mark_all") {
+    summary_rows[[length(summary_rows) + 1]] <- data.frame(
+      peak_set = peak_set,
+      mark_or_factor = peak_info$mark_or_factor,
+      scope = peak_info$scope,
+      status = "skipped_non_mark_all_peak_set",
+      samples_used = 0,
+      eligible_conditions = "",
+      contrasts_tested = 0,
+      result_rows = 0,
+      stringsAsFactors = FALSE
+    )
+    next
+  }
+
   raw <- read_table_safe(count_file, header = FALSE)
-  if (ncol(raw) < 4) next
+  if (ncol(raw) < 4) {
+    summary_rows[[length(summary_rows) + 1]] <- data.frame(
+      peak_set = peak_set,
+      mark_or_factor = peak_info$mark_or_factor,
+      scope = peak_info$scope,
+      status = "skipped_empty_or_invalid_count_file",
+      samples_used = 0,
+      eligible_conditions = "",
+      contrasts_tested = 0,
+      result_rows = 0,
+      stringsAsFactors = FALSE
+    )
+    next
+  }
   n_counts <- ncol(raw) - 3
-  samples <- head(sample_order, n_counts)
+  samples <- sample_order[seq_len(min(n_counts, length(sample_order)))]
   counts <- as.matrix(raw[, 4:ncol(raw), drop = FALSE])
+  if (ncol(counts) > length(samples)) {
+    counts <- counts[, seq_along(samples), drop = FALSE]
+  }
   storage.mode(counts) <- "numeric"
   colnames(counts) <- samples
   rownames(counts) <- paste(raw[[1]], raw[[2]], raw[[3]], sep = ":")
@@ -147,11 +212,27 @@ for (count_file in count_files) {
   sample_info <- sample_info[!is.na(sample_info$sample_id), , drop = FALSE]
   counts <- counts[, sample_info$sample_id, drop = FALSE]
 
+  if (!is.na(peak_info$mark_or_factor) && nzchar(peak_info$mark_or_factor) && "mark_or_factor" %in% names(sample_info)) {
+    sample_info <- sample_info[sample_info$mark_or_factor == peak_info$mark_or_factor, , drop = FALSE]
+    counts <- counts[, sample_info$sample_id, drop = FALSE]
+  }
+
   reps <- table(sample_info$condition)
   eligible_conditions <- names(reps)[reps >= min_reps]
   sample_info <- sample_info[sample_info$condition %in% eligible_conditions, , drop = FALSE]
   counts <- counts[, sample_info$sample_id, drop = FALSE]
   if (length(unique(sample_info$condition)) < 2) {
+    summary_rows[[length(summary_rows) + 1]] <- data.frame(
+      peak_set = peak_set,
+      mark_or_factor = peak_info$mark_or_factor,
+      scope = peak_info$scope,
+      status = "skipped_insufficient_replicated_conditions",
+      samples_used = nrow(sample_info),
+      eligible_conditions = paste(unique(sample_info$condition), collapse = ","),
+      contrasts_tested = 0,
+      result_rows = 0,
+      stringsAsFactors = FALSE
+    )
     next
   }
 
@@ -160,22 +241,69 @@ for (count_file in count_files) {
   plot_basic_qc(counts, sample_info, prefix)
   pairs <- contrast_pairs(sample_info$condition, args[["contrasts"]])
   pairs <- Filter(function(p) all(p %in% sample_info$condition), pairs)
-  if (length(pairs) == 0) next
+  if (length(pairs) == 0) {
+    summary_rows[[length(summary_rows) + 1]] <- data.frame(
+      peak_set = peak_set,
+      mark_or_factor = peak_info$mark_or_factor,
+      scope = peak_info$scope,
+      status = "skipped_no_valid_contrasts",
+      samples_used = nrow(sample_info),
+      eligible_conditions = paste(unique(sample_info$condition), collapse = ","),
+      contrasts_tested = 0,
+      result_rows = 0,
+      stringsAsFactors = FALSE
+    )
+    next
+  }
 
   if (requireNamespace("DESeq2", quietly = TRUE)) {
-    res <- run_deseq2(counts, sample_info, pairs)
+    res <- tryCatch(
+      run_deseq2(counts, sample_info, pairs),
+      error = function(e) {
+        warning("DESeq2 failed for ", peak_set, ": ", conditionMessage(e))
+        data.frame()
+      }
+    )
   } else {
     res <- do.call(rbind, lapply(pairs, function(p) fallback_contrast(counts, sample_info, p[[1]], p[[2]])))
   }
+  if (nrow(res) == 0) {
+    summary_rows[[length(summary_rows) + 1]] <- data.frame(
+      peak_set = peak_set,
+      mark_or_factor = peak_info$mark_or_factor,
+      scope = peak_info$scope,
+      status = "failed_or_no_results",
+      samples_used = nrow(sample_info),
+      eligible_conditions = paste(unique(sample_info$condition), collapse = ","),
+      contrasts_tested = length(pairs),
+      result_rows = 0,
+      stringsAsFactors = FALSE
+    )
+    next
+  }
+  res <- add_peak_set_metadata(res, peak_set, peak_info$mark_or_factor, count_file)
   write_table_safe(res, paste0(prefix, ".differential.tsv", table_suffix))
   split_res <- split(res, res$contrast)
   for (nm in names(split_res)) {
     plot_contrast(split_res[[nm]], paste0(prefix, ".", nm))
   }
   all_results[[length(all_results) + 1]] <- res
+  summary_rows[[length(summary_rows) + 1]] <- data.frame(
+    peak_set = peak_set,
+    mark_or_factor = peak_info$mark_or_factor,
+    scope = peak_info$scope,
+    status = "tested",
+    samples_used = nrow(sample_info),
+    eligible_conditions = paste(unique(sample_info$condition), collapse = ","),
+    contrasts_tested = length(pairs),
+    result_rows = nrow(res),
+    stringsAsFactors = FALSE
+  )
 }
 
 combined <- if (length(all_results) > 0) do.call(rbind, all_results) else data.frame()
+run_summary <- if (length(summary_rows) > 0) do.call(rbind, summary_rows) else data.frame()
+write_table_safe(run_summary, file.path(args[["outdir"]], paste0("differential_binding_run_summary.tsv", table_suffix)))
 write_table_safe(combined, file.path(args[["outdir"]], paste0("differential_binding_results.tsv", table_suffix)))
 if (nrow(combined) == 0) {
   writeLines("No eligible differential contrasts were found. Check conditions, contrasts, and replicate counts.", file.path(args[["outdir"]], "differential_binding_skipped.txt"))

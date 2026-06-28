@@ -26,6 +26,7 @@ require_cmd "${RSCRIPT_BIN}"
   --counts-dir "${CONSENSUS_DIR:-${OUTPUT_DIR}/110-consensus-peaks}/counts" \
   --contrasts "${DIFF_CONTRASTS}" \
   --min-replicates "${MIN_REPLICATES_DIFF}" \
+  --peak-set-scope "${DIFF_PEAK_SET_SCOPE}" \
   --table-suffix "${PIPELINE_TABLE_SUFFIX:-}" \
   --outdir "${STEP_DIR}"
 

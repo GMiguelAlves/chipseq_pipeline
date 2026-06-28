@@ -29,6 +29,9 @@ Useful settings in `config/user_settings.sh`:
   BAMs, peaks, tracks, and count matrices
 - `PIPELINE_COMPRESS_RESULTS`: use `1` to write large TSV-like outputs as
   `.tsv.gz`; downstream steps read `.tsv` and `.tsv.gz`
+- `DIFF_PEAK_SET_SCOPE`: use `mark_all` to run differential binding only on
+  `MARK__all` consensus peak sets, stratified by `mark_or_factor`; use `all`
+  only when condition-specific peak sets should also be tested
 - `PIPELINE_STORAGE_MODE`: use `full`, `balanced`, or `minimal` to control
   cleanup after the final report
 

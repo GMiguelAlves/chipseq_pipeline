@@ -241,6 +241,14 @@ filter -> tracks
 all aggregate outputs -> report
 ```
 
+Differential binding is run by `mark_or_factor` by default. The R step uses
+mark-level consensus matrices named `MARK__all.counts.tsv.gz`, compares
+conditions only within that mark, and writes `peak_set` plus `mark_or_factor`
+into the final tables. Condition-specific consensus matrices such as
+`adult__H3K4me3.counts.tsv.gz` are skipped by default to avoid testing against
+a peak universe derived from a single condition. Set `DIFF_PEAK_SET_SCOPE=all`
+only when you intentionally want to include those extra peak sets.
+
 In Slurm mode, sample-level jobs are submitted independently and downstream
 steps use `--dependency=afterok`. Sample-level steps are throttled with
 RNA-seq-style concurrency settings. For example, `ALIGN_CONCURRENCY=2` keeps at
@@ -263,7 +271,10 @@ Key files:
 - `${WORK_ROOT}/090-peak-annotation/*.annotated.tsv.gz`
 - `${WORK_ROOT}/100-tracks/*.bw`
 - `${WORK_ROOT}/120-differential-binding/differential_binding_results.tsv.gz`
+- `${WORK_ROOT}/120-differential-binding/differential_binding_run_summary.tsv.gz`
 - `${OUTPUT_DIR}/130-reports/chipseq_report.md`
+- `${OUTPUT_DIR}/130-reports/chipseq_sample_qc_summary.tsv.gz`
+- `${OUTPUT_DIR}/130-reports/chipseq_differential_by_peak_set.tsv.gz`
 
 When `PIPELINE_COMPRESS_RESULTS=0`, TSV-like outputs use plain `.tsv`.
 
