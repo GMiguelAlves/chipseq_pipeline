@@ -32,6 +32,13 @@ else
     echo
     echo "Generated files are under: ${WORK_ROOT:-${OUTPUT_DIR}}"
   } > "${STEP_DIR}/chipseq_report.md"
+  {
+    echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>ChIP-seq report</title></head><body>"
+    echo "<h1>ChIP-seq report</h1>"
+    echo "<p>Rscript was not available, so only a minimal report was generated.</p>"
+    echo "<p>Generated files are under: ${WORK_ROOT:-${OUTPUT_DIR}}</p>"
+    echo "</body></html>"
+  } > "${STEP_DIR}/chipseq_report.html"
 fi
 
 mark_done "${STEP}" "final_report"

@@ -273,6 +273,8 @@ Key files:
 - `${WORK_ROOT}/120-differential-binding/differential_binding_results.tsv.gz`
 - `${WORK_ROOT}/120-differential-binding/differential_binding_run_summary.tsv.gz`
 - `${OUTPUT_DIR}/130-reports/chipseq_report.md`
+- `${OUTPUT_DIR}/130-reports/chipseq_report.html`
+- `${OUTPUT_DIR}/130-reports/figures/*.png`
 - `${OUTPUT_DIR}/130-reports/chipseq_sample_qc_summary.tsv.gz`
 - `${OUTPUT_DIR}/130-reports/chipseq_differential_by_peak_set.tsv.gz`
 

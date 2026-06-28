@@ -193,6 +193,197 @@ markdown_table <- function(x, con, max_rows = Inf) {
   }
 }
 
+html_escape <- function(x) {
+  x <- as.character(x)
+  x[is.na(x)] <- "NA"
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;", x, fixed = TRUE)
+  x <- gsub(">", "&gt;", x, fixed = TRUE)
+  x <- gsub('"', "&quot;", x, fixed = TRUE)
+  x
+}
+
+html_table <- function(x, max_rows = Inf) {
+  if (nrow(x) == 0) return("<p>No rows available.</p>")
+  y <- x
+  suffix <- ""
+  if (is.finite(max_rows) && nrow(y) > max_rows) {
+    y <- head(y, max_rows)
+    suffix <- paste0("<p class=\"muted\">Showing first ", max_rows, " of ", nrow(x), " rows.</p>")
+  }
+  y[] <- lapply(y, html_escape)
+  header <- paste0("<tr>", paste0("<th>", html_escape(names(y)), "</th>", collapse = ""), "</tr>")
+  rows <- apply(y, 1, function(row) paste0("<tr>", paste0("<td>", row, "</td>", collapse = ""), "</tr>"))
+  paste0("<table>", header, paste(rows, collapse = "\n"), "</table>", suffix)
+}
+
+write_plot <- function(path, width = 1200, height = 800, plot_fun) {
+  ok <- FALSE
+  tryCatch({
+    png(path, width = width, height = height, res = 120)
+    plot_fun()
+    ok <<- TRUE
+  }, error = function(e) {
+    writeLines(paste("Plot skipped:", conditionMessage(e)), paste0(path, ".txt"))
+  }, finally = {
+    if (names(dev.cur()) != "null device") dev.off()
+  })
+  if (ok && file.exists(path)) basename(path) else NA_character_
+}
+
+plot_report_figures <- function(report_dir, sample_summary, annotation_totals, consensus_summary, diff_summary) {
+  figures_dir <- file.path(report_dir, "figures")
+  dir.create(figures_dir, recursive = TRUE, showWarnings = FALSE)
+  figures <- list()
+
+  if (any(!is.na(sample_summary$aligner_overall_alignment_pct))) {
+    x <- sample_summary[!is.na(sample_summary$aligner_overall_alignment_pct), , drop = FALSE]
+    x <- x[order(x$aligner_overall_alignment_pct), , drop = FALSE]
+    figures$alignment <- write_plot(file.path(figures_dir, "alignment_rate_by_sample.png"), 1200, 1100, function() {
+      op <- par(mar = c(5, 12, 4, 2))
+      on.exit(par(op), add = TRUE)
+      cols <- ifelse(x$aligner_overall_alignment_pct < 70, "#b23a48", "#256d85")
+      barplot(x$aligner_overall_alignment_pct, horiz = TRUE, las = 1, names.arg = x$sample_id,
+              xlim = c(0, 100), col = cols, border = NA, cex.names = 0.65,
+              xlab = "Overall alignment rate (%)", main = "Alignment rate by sample")
+      abline(v = 70, lty = 2, col = "#b23a48")
+      legend("bottomright", legend = c(">=70%", "<70%"), fill = c("#256d85", "#b23a48"), bty = "n")
+    })
+  }
+
+  if (any(!is.na(sample_summary$peak_count))) {
+    x <- sample_summary[!is.na(sample_summary$peak_count) & !sample_summary$is_control, , drop = FALSE]
+    x <- x[order(x$peak_count), , drop = FALSE]
+    marks <- sort(unique(x$mark_or_factor))
+    base_cols <- c("#256d85", "#7b8f3a", "#b55d3a", "#6d5a8d", "#4f6f52", "#9a6b2f")
+    palette <- setNames(rep(base_cols, length.out = length(marks)), marks)
+    figures$peaks <- write_plot(file.path(figures_dir, "peak_counts_by_sample.png"), 1200, 1100, function() {
+      op <- par(mar = c(5, 12, 4, 2))
+      on.exit(par(op), add = TRUE)
+      barplot(log10(x$peak_count + 1), horiz = TRUE, las = 1, names.arg = x$sample_id,
+              col = palette[x$mark_or_factor], border = NA, cex.names = 0.65,
+              xlab = "log10(peak count + 1)", main = "Peak counts by sample")
+      legend("bottomright", legend = names(palette), fill = palette, bty = "n", cex = 0.8)
+    })
+  }
+
+  if (nrow(annotation_totals) > 0) {
+    a <- annotation_totals[order(annotation_totals$n, decreasing = TRUE), , drop = FALSE]
+    figures$annotation <- write_plot(file.path(figures_dir, "peak_annotation_classes.png"), 1000, 700, function() {
+      op <- par(mar = c(8, 5, 4, 2))
+      on.exit(par(op), add = TRUE)
+      barplot(a$n, names.arg = a$class, las = 2, col = "#6d5a8d", border = NA,
+              ylab = "Annotated peaks", main = "Peak annotation classes")
+    })
+  }
+
+  if (nrow(consensus_summary) > 0) {
+    c <- consensus_summary[order(consensus_summary$consensus_peak_count, decreasing = TRUE), , drop = FALSE]
+    c <- head(c, 20)
+    figures$consensus <- write_plot(file.path(figures_dir, "consensus_peak_sets.png"), 1200, 900, function() {
+      op <- par(mar = c(5, 14, 4, 2))
+      on.exit(par(op), add = TRUE)
+      barplot(c$consensus_peak_count, horiz = TRUE, las = 1, names.arg = c$peak_set,
+              col = "#7b8f3a", border = NA, cex.names = 0.7,
+              xlab = "Consensus peaks", main = "Consensus peak sets")
+    })
+  }
+
+  if (nrow(diff_summary$by_mark) > 0) {
+    d <- diff_summary$by_mark[order(diff_summary$by_mark$significant_padj_0_05, decreasing = TRUE), , drop = FALSE]
+    figures$differential <- write_plot(file.path(figures_dir, "differential_significant_by_mark.png"), 1000, 700, function() {
+      op <- par(mar = c(8, 5, 4, 2))
+      on.exit(par(op), add = TRUE)
+      vals <- rbind(padj_0_05 = d$significant_padj_0_05, padj_0_10 = d$significant_padj_0_10)
+      barplot(vals, beside = TRUE, names.arg = d$mark_or_factor, las = 2,
+              col = c("#256d85", "#b55d3a"), border = NA,
+              ylab = "Significant regions", main = "Differential regions by mark")
+      legend("topright", legend = c("padj < 0.05", "padj < 0.10"), fill = c("#256d85", "#b55d3a"), bty = "n")
+    })
+  }
+
+  Filter(function(x) !is.na(x), figures)
+}
+
+write_html_report <- function(path, report_dir, outdir, metadata, sample_display, group_summary,
+                              annotation_totals, annotation_summary, consensus_summary,
+                              count_summary, diff_summary, recommendations, figures,
+                              sample_summary_file, diff_summary_file, diff_peak_set_file) {
+  fig_path <- function(name) paste0("figures/", figures[[name]])
+  fig_block <- function(name, title) {
+    if (is.null(figures[[name]]) || is.na(figures[[name]])) return("")
+    paste0("<figure><img src=\"", fig_path(name), "\" alt=\"", html_escape(title),
+           "\"><figcaption>", html_escape(title), "</figcaption></figure>")
+  }
+  consensus_display <- if (nrow(consensus_summary) > 0) {
+    consensus_summary[order(consensus_summary$consensus_peak_count, decreasing = TRUE), , drop = FALSE]
+  } else {
+    consensus_summary
+  }
+  css <- paste(
+    "body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f7f8f6;color:#202124}",
+    "header{background:#263238;color:white;padding:28px 36px}",
+    "main{padding:24px 36px;max-width:1320px;margin:auto}",
+    "section{background:white;border:1px solid #ddd;margin:18px 0;padding:20px;border-radius:6px}",
+    "h1,h2,h3{margin-top:0}",
+    ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}",
+    ".metric{background:#eef3f3;border-left:5px solid #256d85;padding:12px;border-radius:4px}",
+    ".warn{background:#fff4e8;border-left:5px solid #b55d3a;padding:12px;border-radius:4px}",
+    "table{border-collapse:collapse;width:100%;font-size:13px;margin-top:10px}",
+    "th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}",
+    "th{background:#edf0f2}",
+    "img{max-width:100%;height:auto;border:1px solid #ddd;background:white}",
+    "figure{margin:12px 0}figcaption{font-size:13px;color:#555;margin-top:6px}",
+    ".muted{color:#666;font-size:13px}",
+    "a{color:#256d85}",
+    sep = "\n"
+  )
+  html <- c(
+    "<!doctype html>",
+    "<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    "<title>ChIP-seq final report</title>",
+    paste0("<style>", css, "</style></head><body>"),
+    "<header><h1>ChIP-seq final report</h1>",
+    paste0("<p>Generated: ", html_escape(format(Sys.time(), "%Y-%m-%d %H:%M:%S")), "</p>"),
+    paste0("<p>Work directory: ", html_escape(outdir), "</p></header><main>"),
+    "<section><h2>Run overview</h2><div class=\"grid\">",
+    paste0("<div class=\"metric\"><b>Total samples</b><br>", nrow(metadata), "</div>"),
+    paste0("<div class=\"metric\"><b>IP samples</b><br>", sum(!tolower(as.character(metadata$is_control)) %in% c("true", "1", "yes", "y")), "</div>"),
+    paste0("<div class=\"metric\"><b>Control/input samples</b><br>", sum(tolower(as.character(metadata$is_control)) %in% c("true", "1", "yes", "y")), "</div>"),
+    paste0("<div class=\"metric\"><b>Marks/factors</b><br>", length(unique(metadata$mark_or_factor)), "</div>"),
+    "</div></section>",
+    "<section><h2>Automatic recommendations</h2>",
+    paste0("<div class=\"warn\">", paste(paste0("<p>", html_escape(recommendations), "</p>"), collapse = "\n"), "</div></section>"),
+    "<section><h2>Figures</h2>",
+    fig_block("alignment", "Alignment rate by sample"),
+    fig_block("peaks", "Peak counts by sample"),
+    fig_block("differential", "Differential regions by mark"),
+    fig_block("annotation", "Peak annotation classes"),
+    fig_block("consensus", "Consensus peak sets"),
+    "</section>",
+    "<section><h2>Group summary</h2>", html_table(group_summary, 100), "</section>",
+    "<section><h2>Sample QC summary</h2>",
+    paste0("<p class=\"muted\">Full table: <a href=\"", basename(sample_summary_file), "\">", basename(sample_summary_file), "</a></p>"),
+    html_table(sample_display, 200), "</section>",
+    "<section><h2>Peak annotation</h2>",
+    if (nrow(annotation_totals) > 0) html_table(annotation_totals[order(annotation_totals$n, decreasing = TRUE), , drop = FALSE], 50) else "<p>No annotation totals available.</p>",
+    "<h3>Annotation by peak set</h3>", html_table(annotation_summary, 80), "</section>",
+    "<section><h2>Consensus peaks</h2>",
+    html_table(consensus_display, 50),
+    "<h3>Count matrices</h3>", html_table(count_summary, 50), "</section>",
+    "<section><h2>Differential binding</h2>",
+    if (nrow(diff_summary$overall) > 0) html_table(diff_summary$overall, 10) else "<p>No differential results available.</p>",
+    "<h3>By mark/factor</h3>", html_table(diff_summary$by_mark, 50),
+    "<h3>By peak set</h3>", html_table(diff_summary$by_peak_set, 50),
+    "<h3>By contrast</h3>", html_table(diff_summary$by_contrast, 50),
+    paste0("<p class=\"muted\">Full contrast summary: <a href=\"", basename(diff_summary_file), "\">", basename(diff_summary_file), "</a></p>"),
+    paste0("<p class=\"muted\">Full peak-set summary: <a href=\"", basename(diff_peak_set_file), "\">", basename(diff_peak_set_file), "</a></p>"),
+    "</section>",
+    "</main></body></html>"
+  )
+  writeLines(html, path, useBytes = TRUE)
+}
+
 summarise_diff <- function(diff_results) {
   if (nrow(diff_results) == 0) {
     return(list(overall = data.frame(), by_contrast = data.frame(), by_method = data.frame(),
@@ -392,7 +583,7 @@ if (length(low_trim) > 0) {
   recommendations <- c(recommendations, paste("Inspect samples with low read retention after trimming:", paste(low_trim, collapse = ", ")))
 }
 if (all(is.na(sample_summary$raw_reads_fastp)) && any(!is.na(sample_summary$aligner_input_reads))) {
-  recommendations <- c(recommendations, "fastp JSON reports were not found, so raw/trimming read counts are unavailable; use aligner_input_reads as the available read-input proxy.")
+  recommendations <- c(recommendations, "fastp JSON reports were not found. This is expected for Trimmomatic or other non-fastp trimming; use aligner_input_reads as the available read-input proxy.")
 }
 zero_peaks <- sample_summary$sample_id[!is.na(sample_summary$peak_count) & sample_summary$peak_count == 0 & !sample_summary$is_control]
 if (length(zero_peaks) > 0) {
@@ -425,6 +616,34 @@ write_tsv_safe(group_summary, group_summary_file)
 if (nrow(diff_summary$by_contrast) > 0) write_tsv_safe(diff_summary$by_contrast, diff_summary_file)
 if (nrow(diff_summary$by_peak_set_contrast) > 0) write_tsv_safe(diff_summary$by_peak_set_contrast, diff_peak_set_file)
 
+sample_display <- sample_summary[, c("sample_id", "condition", "mark_or_factor", "is_control", "raw_reads_fastp",
+                                     "trimmed_reads_fastp", "trim_retained_pct", "aligner_input_reads", "aligner_overall_alignment_pct",
+                                     "aligned_bam_reads", "aligned_bam_mapped_pct", "final_filtered_reads",
+                                     "peak_type", "peak_count"), drop = FALSE]
+sample_display$trim_retained_pct <- percent(sample_display$trim_retained_pct)
+sample_display$aligner_overall_alignment_pct <- percent(sample_display$aligner_overall_alignment_pct)
+sample_display$aligned_bam_mapped_pct <- percent(sample_display$aligned_bam_mapped_pct)
+
+figures <- plot_report_figures(report_dir, sample_summary, annotation_totals, consensus_summary, diff_summary)
+write_html_report(
+  path = file.path(report_dir, "chipseq_report.html"),
+  report_dir = report_dir,
+  outdir = outdir,
+  metadata = metadata,
+  sample_display = sample_display,
+  group_summary = group_summary,
+  annotation_totals = annotation_totals,
+  annotation_summary = annotation_summary,
+  consensus_summary = consensus_summary,
+  count_summary = count_summary,
+  diff_summary = diff_summary,
+  recommendations = recommendations,
+  figures = figures,
+  sample_summary_file = sample_summary_file,
+  diff_summary_file = diff_summary_file,
+  diff_peak_set_file = diff_peak_set_file
+)
+
 con <- file(report, open = "w", encoding = "UTF-8")
 on.exit(close(con), add = TRUE)
 
@@ -442,6 +661,9 @@ writeLines(c(
   paste("Conditions:", paste(sort(unique(metadata$condition)), collapse = ", ")),
   paste("Marks/factors:", paste(sort(unique(metadata$mark_or_factor)), collapse = ", ")),
   "",
+  "HTML report: `chipseq_report.html`",
+  "Report figures: `figures/`",
+  "",
   "## Important interpretation notes",
   "",
   "- `aligner_overall_alignment_pct` comes from the aligner log when available and is the preferred mapping-rate metric.",
@@ -455,13 +677,6 @@ writeLines("## Group summary\n", con)
 markdown_table(group_summary, con, max_rows = 100)
 
 writeLines(c("", "## Sample QC summary", ""), con)
-sample_display <- sample_summary[, c("sample_id", "condition", "mark_or_factor", "is_control", "raw_reads_fastp",
-                                     "trimmed_reads_fastp", "trim_retained_pct", "aligner_input_reads", "aligner_overall_alignment_pct",
-                                     "aligned_bam_reads", "aligned_bam_mapped_pct", "final_filtered_reads",
-                                     "peak_type", "peak_count"), drop = FALSE]
-sample_display$trim_retained_pct <- percent(sample_display$trim_retained_pct)
-sample_display$aligner_overall_alignment_pct <- percent(sample_display$aligner_overall_alignment_pct)
-sample_display$aligned_bam_mapped_pct <- percent(sample_display$aligned_bam_mapped_pct)
 markdown_table(sample_display, con, max_rows = 200)
 writeLines(paste0("\nFull sample QC table: `", basename(sample_summary_file), "`"), con)
 
