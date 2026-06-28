@@ -53,19 +53,32 @@ contrast_pairs <- function(conditions, contrast_text) {
 plot_basic_qc <- function(counts, sample_info, out_prefix) {
   log_counts <- log2(counts + 1)
   if (ncol(log_counts) >= 2 && nrow(log_counts) >= 2) {
-    pdf(paste0(out_prefix, ".pca.pdf"))
-    pca <- prcomp(t(log_counts), scale. = TRUE)
-    plot(pca$x[, 1], pca$x[, 2], pch = 19, col = as.integer(factor(sample_info$condition)),
-         xlab = "PC1", ylab = "PC2", main = "Peak count PCA")
-    text(pca$x[, 1], pca$x[, 2], labels = sample_info$sample_id, pos = 3, cex = 0.7)
-    legend("topright", legend = levels(factor(sample_info$condition)), col = seq_along(levels(factor(sample_info$condition))), pch = 19, cex = 0.7)
-    dev.off()
+    row_var <- apply(log_counts, 1, var)
+    variable_rows <- which(is.finite(row_var) & row_var > 0)
 
-    top_var <- order(apply(log_counts, 1, var), decreasing = TRUE)
-    top_var <- head(top_var, min(500, length(top_var)))
-    pdf(paste0(out_prefix, ".heatmap.pdf"))
-    heatmap(as.matrix(log_counts[top_var, , drop = FALSE]), Colv = NA, scale = "row", margins = c(8, 5))
-    dev.off()
+    if (length(variable_rows) >= 2) {
+      pca_input <- log_counts[variable_rows, , drop = FALSE]
+      pdf(paste0(out_prefix, ".pca.pdf"))
+      pca <- prcomp(t(pca_input), scale. = TRUE)
+      if (ncol(pca$x) >= 2) {
+        plot(pca$x[, 1], pca$x[, 2], pch = 19, col = as.integer(factor(sample_info$condition)),
+             xlab = "PC1", ylab = "PC2", main = "Peak count PCA")
+        text(pca$x[, 1], pca$x[, 2], labels = sample_info$sample_id, pos = 3, cex = 0.7)
+        legend("topright", legend = levels(factor(sample_info$condition)), col = seq_along(levels(factor(sample_info$condition))), pch = 19, cex = 0.7)
+      } else {
+        plot.new()
+        text(0.5, 0.5, "PCA skipped: fewer than two informative components")
+      }
+      dev.off()
+
+      top_var <- variable_rows[order(row_var[variable_rows], decreasing = TRUE)]
+      top_var <- head(top_var, min(500, length(top_var)))
+      pdf(paste0(out_prefix, ".heatmap.pdf"))
+      heatmap(as.matrix(log_counts[top_var, , drop = FALSE]), Colv = NA, scale = "row", margins = c(8, 5))
+      dev.off()
+    } else {
+      writeLines("PCA/heatmap skipped: fewer than two variable peaks after filtering.", paste0(out_prefix, ".qc_skipped.txt"))
+    }
   }
 }
 
