@@ -78,6 +78,9 @@ esac
 
 samtools index -@ "${THREADS}" "${BAM}"
 samtools quickcheck "${BAM}" || die "${SAMPLE_ID}: BAM failed samtools quickcheck"
+samtools flagstat -@ "${THREADS}" "${BAM}" > "${STEP_DIR}/${SAMPLE_ID}.aligned.flagstat.txt"
+samtools idxstats -@ "${THREADS}" "${BAM}" > "${STEP_DIR}/${SAMPLE_ID}.aligned.idxstats.txt"
+samtools stats -@ "${THREADS}" "${BAM}" > "${STEP_DIR}/${SAMPLE_ID}.aligned.stats.txt"
 
 mark_done "${STEP}" "${SAMPLE_ID}"
 log "Alignment completed for ${SAMPLE_ID}"

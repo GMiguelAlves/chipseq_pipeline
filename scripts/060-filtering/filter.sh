@@ -34,6 +34,7 @@ DEDUP_BAM="${STEP_DIR}/${SAMPLE_ID}.dedup.bam"
 FINAL_BAM="${STEP_DIR}/${SAMPLE_ID}.filtered.bam"
 
 run_cmd "samtools view -@ ${THREADS} -b -q ${MIN_MAPQ} -F ${FLAG_FILTER} '${IN_BAM}' > '${MAPQ_BAM}'"
+samtools flagstat -@ "${THREADS}" "${MAPQ_BAM}" > "${STEP_DIR}/${SAMPLE_ID}.mapq.flagstat.txt"
 
 if bool_true "${REMOVE_DUPLICATES}"; then
   case "${DEDUP_TOOL}" in
@@ -57,6 +58,7 @@ if bool_true "${REMOVE_DUPLICATES}"; then
 else
   cp "${MAPQ_BAM}" "${DEDUP_BAM}"
 fi
+samtools flagstat -@ "${THREADS}" "${DEDUP_BAM}" > "${STEP_DIR}/${SAMPLE_ID}.dedup.flagstat.txt"
 
 if [[ -n "${BLACKLIST_BED}" ]]; then
   require_cmd bedtools
