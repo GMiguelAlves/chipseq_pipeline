@@ -240,8 +240,12 @@ export MIN_REPLICATES_DIFF="${MIN_REPLICATES_DIFF:-2}"
 export REQUIRE_DIFF_REPLICATES="${REQUIRE_DIFF_REPLICATES:-false}"
 export DIFF_PEAK_SET_SCOPE="${DIFF_PEAK_SET_SCOPE:-mark_all}" # mark_all or all
 
-# Slurm concurrency for sample-level steps. This mimics RNA-seq-style
-# --array=1-N%CONCURRENCY throttling while keeping separate sample logs.
+# Slurm submission mode for sample-level steps.
+# array: submit one Slurm array per step, using --array=1-N%CONCURRENCY.
+# individual: submit one sbatch job per sample, with dependency throttling.
+export SLURM_SAMPLE_SUBMISSION_MODE="${SLURM_SAMPLE_SUBMISSION_MODE:-array}"
+
+# Slurm concurrency for sample-level steps.
 export QC_CONCURRENCY="${QC_CONCURRENCY:-8}"
 export TRIM_CONCURRENCY="${TRIM_CONCURRENCY:-4}"
 export ALIGN_CONCURRENCY="${ALIGN_CONCURRENCY:-2}"

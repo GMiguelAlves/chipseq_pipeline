@@ -249,13 +249,14 @@ into the final tables. Condition-specific consensus matrices such as
 a peak universe derived from a single condition. Set `DIFF_PEAK_SET_SCOPE=all`
 only when you intentionally want to include those extra peak sets.
 
-In Slurm mode, sample-level jobs are submitted independently and downstream
-steps use `--dependency=afterok`. Sample-level steps are throttled with
-RNA-seq-style concurrency settings. For example, `ALIGN_CONCURRENCY=2` keeps at
-most two alignment jobs eligible at a time; each later alignment depends on an
-earlier alignment finishing successfully. The orchestrator submits jobs using
-`sbatch --chdir`, `--export`, `--parsable`, and a shared `submit_sbatch`
-helper.
+In Slurm mode, sample-level steps use RNA-seq-style job arrays by default.
+For example, `ALIGN_CONCURRENCY=2` submits one alignment array with
+`--array=1-N%2`, so Slurm keeps at most two alignment tasks running at once.
+Downstream steps use `--dependency=afterok` on the upstream array. Set
+`SLURM_SAMPLE_SUBMISSION_MODE=individual` only when a cluster cannot run arrays
+and you need the older one-sbatch-per-sample behavior. The orchestrator submits
+jobs using `sbatch --chdir`, `--export`, `--parsable`, and a shared
+`submit_sbatch` helper.
 
 ## Outputs
 

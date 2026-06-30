@@ -63,6 +63,11 @@ case "${PEAK_CALLER}" in
   *) die "PEAK_CALLER must be macs2 or macs3, got: ${PEAK_CALLER}" ;;
 esac
 
+case "${SLURM_SAMPLE_SUBMISSION_MODE:-array}" in
+  array|individual) ;;
+  *) die "SLURM_SAMPLE_SUBMISSION_MODE must be array or individual, got: ${SLURM_SAMPLE_SUBMISSION_MODE}" ;;
+esac
+
 case "${PEAK_TYPE}" in
   auto|narrow|broad) ;;
   *) die "PEAK_TYPE must be auto, narrow, or broad, got: ${PEAK_TYPE}" ;;

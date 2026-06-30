@@ -31,9 +31,23 @@ The orchestrator creates `000-logs/<step>/` directories and submits jobs with
 000-logs/<step>/<sample-or-target>.err
 ```
 
+For sample-level steps, the default Slurm mode is one job array per step:
+
+```text
+chipseq_align_array  --array=1-N%ALIGN_CONCURRENCY
+chipseq_filter_array --array=1-N%FILTER_CONCURRENCY
+chipseq_peaks_array  --array=1-N%PEAKS_CONCURRENCY
+```
+
+Each array task redirects its real output to the sample-specific log files above.
+The scheduler may also create lightweight `array_<job>_<task>.out/.err` files.
+
 ## Dependencies
 
-In the full workflow, downstream steps use `--dependency=afterok`.
+In the full workflow, downstream steps use `--dependency=afterok`. When arrays
+are enabled, downstream steps depend on the whole upstream array, so alignment
+waits for trimming, filtering waits for alignment, and peak calling waits for
+all filtered IP/control BAMs to be available.
 
 ## Cluster-Specific Settings
 
@@ -46,6 +60,7 @@ Keep these in `config/user_settings.sh`:
 - `SLURM_PARTITION`
 - `SLURM_ACCOUNT`
 - `SLURM_QOS`
+- `SLURM_SAMPLE_SUBMISSION_MODE=array`
 - `CONDA_BASE`
 - `PIPELINE_COMPRESS_RESULTS`
 - `PIPELINE_STORAGE_MODE`

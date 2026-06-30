@@ -80,9 +80,13 @@ export DIFF_CONTRASTS=""          # Example: treated:control,drug:vehicle
 export MIN_REPLICATES_DIFF=2
 export DIFF_PEAK_SET_SCOPE="mark_all" # mark_all uses MARK__all consensus sets for differential binding.
 
-# 11) Slurm concurrency for sample-level jobs.
-# These limits avoid submitting/running all samples at once. Increase only if
-# your account and filesystem can handle it.
+# 11) Slurm arrays and concurrency for sample-level jobs.
+# array matches the RNA-seq pipeline style: one queued job array per step.
+# individual keeps the older one-sbatch-per-sample behavior.
+export SLURM_SAMPLE_SUBMISSION_MODE="array"
+
+# These limits avoid running all samples at once. Increase only if your account
+# and filesystem can handle it.
 export QC_CONCURRENCY=8
 export TRIM_CONCURRENCY=4
 export ALIGN_CONCURRENCY=2

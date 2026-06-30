@@ -112,6 +112,10 @@ ensure_dir() {
   mkdir -p "$@"
 }
 
+safe_name() {
+  printf '%s\n' "$1" | tr '/: ' '___'
+}
+
 resolve_path() {
   local path="$1"
   local base="${2:-${FASTQ_DIR:-.}}"
