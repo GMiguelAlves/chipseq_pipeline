@@ -42,6 +42,12 @@ Check the installed tools for the current config:
 bash scripts/check_install.sh
 ```
 
+Run the user-friendly preflight check:
+
+```bash
+bash chipseq_pipeline.sh --preflight
+```
+
 Validate the pipeline graph before submitting jobs:
 
 ```bash
@@ -118,7 +124,8 @@ Required organism-specific inputs:
 Optional inputs:
 
 - `BLACKLIST_BED`
-- `EFFECTIVE_GENOME_SIZES`
+- `EFFECTIVE_GENOME_SIZES`: optional one-column or two-column table with an
+  effective genome size. It is used when MACS/RPGC size settings are `auto`.
 - `FUNCTIONAL_ANNOTATION`
 
 Important execution settings:
@@ -136,6 +143,8 @@ Important execution settings:
 - `TRIM_TOOL=fastp` or `trim_galore`
 - `PEAK_CALLER=macs3` or `macs2`
 - `PEAK_TYPE=auto`, `narrow`, or `broad`
+- `MACS_GENOME_SIZE=auto` or a numeric effective genome size for peak calling
+- `EFFECTIVE_GENOME_SIZE=auto` or a numeric value for RPGC bigWig normalization
 - `ALLOW_MISSING_CONTROLS=true` only when matched input/control FASTQs are not available
 - `PROMOTER_UPSTREAM` and `PROMOTER_DOWNSTREAM`
 - `PIPELINE_COMPRESS_RESULTS=1` to write large TSV-like outputs as `.tsv.gz`
@@ -175,6 +184,8 @@ sample_id fastq_1 fastq_2 layout assay mark_or_factor condition replicate batch 
 Rules enforced before execution:
 
 - `sample_id` must be unique.
+- `sample_id` may contain only letters, numbers, dot, underscore, and hyphen
+  because it is used in output paths.
 - `layout` must be `single` or `paired`.
 - If `layout=paired`, `fastq_2` is required.
 - If `layout=single`, `fastq_2` may be empty.
@@ -183,6 +194,8 @@ Rules enforced before execution:
   MACS is run without `-c`; use this only when input/control data are unavailable.
 - If `is_control=true`, the sample is treated as input/control and peak calling is skipped.
 - Replicate counts are checked for differential binding readiness.
+- `condition` and `mark_or_factor` may contain other characters, but group
+  output filenames normalize them to safe names.
 
 ## Run
 

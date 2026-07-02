@@ -3,6 +3,7 @@ import argparse
 import csv
 import gzip
 import os
+import re
 import sys
 from collections import Counter, defaultdict
 
@@ -27,6 +28,7 @@ REQUIRED_COLUMNS = [
 
 TRUE_VALUES = {"true", "1", "yes", "y"}
 FALSE_VALUES = {"false", "0", "no", "n"}
+FILENAME_SAFE_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def fail(messages):
@@ -120,6 +122,20 @@ def main():
             control_rows[sid] = row
         else:
             ip_rows[sid] = row
+
+        if sid and not FILENAME_SAFE_RE.match(sid):
+            errors.append(
+                f"{sid}: sample_id may only contain letters, numbers, dot, underscore, or hyphen"
+            )
+
+        for label in ("condition", "mark_or_factor"):
+            value = (row.get(label) or "").strip()
+            if not value:
+                errors.append(f"{sid}: {label} is required")
+            elif not FILENAME_SAFE_RE.match(value):
+                warnings.append(
+                    f"{sid}: {label} contains characters that will be normalized in group output names: {value}"
+                )
 
         fq1 = resolve_path((row.get("fastq_1") or "").strip(), args.fastq_dir)
         fq2 = resolve_path((row.get("fastq_2") or "").strip(), args.fastq_dir)

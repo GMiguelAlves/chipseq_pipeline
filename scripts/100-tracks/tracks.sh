@@ -23,6 +23,12 @@ if [[ "${TARGET}" == "aggregate" ]]; then
   require_cmd samtools
   if command -v bamCoverage >/dev/null 2>&1; then
     awk -F '\t' 'BEGIN{OFS="\t"}
+      function clean(x) {
+        gsub(/[^A-Za-z0-9._-]+/, "_", x)
+        gsub(/^_+|_+$/, "", x)
+        if (x == "") x = "unnamed"
+        return x
+      }
       NR==1 {
         for (i=1; i<=NF; i++) {
           if ($i=="sample_id") s=i
@@ -34,7 +40,7 @@ if [[ "${TARGET}" == "aggregate" ]]; then
       }
       NR>1 {
         v=tolower($ctrl)
-        if (v!="true" && v!="1" && v!="yes") print $c"__"$m, $s
+        if (v!="true" && v!="1" && v!="yes") print clean($c)"__"clean($m), $s
       }' "${METADATA_FILE}" | sort > "${STEP_DIR}/track_groups.tsv"
     cut -f1 "${STEP_DIR}/track_groups.tsv" | sort -u | while read -r GROUP_ID; do
       [[ -n "${GROUP_ID}" ]] || continue
@@ -46,10 +52,11 @@ if [[ "${TARGET}" == "aggregate" ]]; then
       NORM_ARGS="--normalizeUsing ${BIGWIG_NORMALIZATION}"
       if [[ "${BIGWIG_NORMALIZATION}" == "RPGC" ]]; then
         if [[ "${EFFECTIVE_GENOME_SIZE}" == "auto" ]]; then
-          EFFECTIVE_SIZE="$(awk '{s+=$2} END {print s}' "${REF_DIR:-${OUTPUT_DIR}/010-reference}/chrom.sizes")"
+          EFFECTIVE_SIZE="$(effective_genome_size_value "auto" "${REF_DIR:-${OUTPUT_DIR}/010-reference}/chrom.sizes")"
         else
           EFFECTIVE_SIZE="${EFFECTIVE_GENOME_SIZE}"
         fi
+        [[ -n "${EFFECTIVE_SIZE}" ]] || die "Could not determine effective genome size for RPGC"
         NORM_ARGS="${NORM_ARGS} --effectiveGenomeSize ${EFFECTIVE_SIZE}"
       fi
       run_cmd "bamCoverage -b '${MERGED}' -o '${STEP_DIR}/${GROUP_ID}.bw' -p ${THREADS} --binSize ${BIN_SIZE} ${NORM_ARGS}"
@@ -72,10 +79,11 @@ if command -v bamCoverage >/dev/null 2>&1; then
   NORM_ARGS="--normalizeUsing ${BIGWIG_NORMALIZATION}"
   if [[ "${BIGWIG_NORMALIZATION}" == "RPGC" ]]; then
     if [[ "${EFFECTIVE_GENOME_SIZE}" == "auto" ]]; then
-      EFFECTIVE_SIZE="$(awk '{s+=$2} END {print s}' "${REF_DIR:-${OUTPUT_DIR}/010-reference}/chrom.sizes")"
+      EFFECTIVE_SIZE="$(effective_genome_size_value "auto" "${REF_DIR:-${OUTPUT_DIR}/010-reference}/chrom.sizes")"
     else
       EFFECTIVE_SIZE="${EFFECTIVE_GENOME_SIZE}"
     fi
+    [[ -n "${EFFECTIVE_SIZE}" ]] || die "Could not determine effective genome size for RPGC"
     NORM_ARGS="${NORM_ARGS} --effectiveGenomeSize ${EFFECTIVE_SIZE}"
   fi
   run_cmd "bamCoverage -b '${BAM}' -o '${STEP_DIR}/${TARGET}.bw' -p ${THREADS} --binSize ${BIN_SIZE} ${NORM_ARGS}"

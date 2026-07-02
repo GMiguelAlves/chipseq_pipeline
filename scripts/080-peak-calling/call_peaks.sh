@@ -43,10 +43,11 @@ CHROM_SIZES="${REF_DIR:-${OUTPUT_DIR}/010-reference}/chrom.sizes"
 [[ -s "${CHROM_SIZES}" ]] || die "chrom.sizes not found; run reference step first"
 
 if [[ "${MACS_GENOME_SIZE}" == "auto" ]]; then
-  GENOME_SIZE="$(awk '{s+=$2} END {print s}' "${CHROM_SIZES}")"
+  GENOME_SIZE="$(effective_genome_size_value "auto" "${CHROM_SIZES}")"
 else
   GENOME_SIZE="${MACS_GENOME_SIZE}"
 fi
+[[ -n "${GENOME_SIZE}" ]] || die "Could not determine genome size for MACS"
 
 LAYOUT="$(sample_layout "${SAMPLE_ID}")"
 FORMAT="BAM"
@@ -81,7 +82,12 @@ fi
 run_cmd "${PEAK_CALLER} callpeak -t '${TREAT_BAM}' ${CONTROL_ARGS} -f ${FORMAT} -g ${GENOME_SIZE} -n '${SAMPLE_ID}' --outdir '${STEP_DIR}' -q ${MACS_QVALUE} ${BROAD_ARGS} ${MACS_EXTRA_OPTS}"
 
 [[ -s "${PEAK_FILE}" ]] || die "${SAMPLE_ID}: expected peak file was not created: ${PEAK_FILE}"
-awk -v sample="${SAMPLE_ID}" 'BEGIN{OFS="\t"} END{print sample, NR}' "${PEAK_FILE}" > "${STEP_DIR}/${SAMPLE_ID}.peak_counts.tsv"
+PEAK_COUNT="$(awk 'END{print NR}' "${PEAK_FILE}")"
+awk -v sample="${SAMPLE_ID}" -v count="${PEAK_COUNT}" 'BEGIN{OFS="\t"; print sample, count}' > "${STEP_DIR}/${SAMPLE_ID}.peak_counts.tsv"
+{
+  printf 'sample_id\tpeak_type\tpeak_file\tpeak_count\tgenome_size\n'
+  printf '%s\t%s\t%s\t%s\t%s\n' "${SAMPLE_ID}" "${CALL_TYPE}" "${PEAK_FILE}" "${PEAK_COUNT}" "${GENOME_SIZE}"
+} > "${STEP_DIR}/${SAMPLE_ID}.peak_manifest.tsv"
 
 mark_done "${STEP}" "${SAMPLE_ID}"
 log "Peak calling completed for ${SAMPLE_ID}"

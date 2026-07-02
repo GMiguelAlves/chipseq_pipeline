@@ -45,6 +45,9 @@ export ALIGNER="bowtie2"          # bowtie2 or bwa
 export TRIM_TOOL="fastp"          # fastp or trim_galore
 export PEAK_CALLER="macs3"        # macs3 or macs2
 export PEAK_TYPE="auto"           # auto, narrow, or broad
+# Use auto for most organisms. Set MACS_GENOME_SIZE manually only when you know
+# the appropriate effective genome size for peak calling.
+export MACS_GENOME_SIZE="auto"
 # Set to true only when matched input/control FASTQs are not available.
 # MACS will then run without -c for IP samples with an empty control_id.
 export ALLOW_MISSING_CONTROLS="false"
@@ -76,6 +79,9 @@ export REMOVE_DUPLICATES="true"
 export PROMOTER_UPSTREAM=2000
 export PROMOTER_DOWNSTREAM=500
 export BIGWIG_NORMALIZATION="CPM"
+# Used only when BIGWIG_NORMALIZATION="RPGC". With auto, the pipeline uses
+# EFFECTIVE_GENOME_SIZES when provided, otherwise the total FASTA length.
+export EFFECTIVE_GENOME_SIZE="auto"
 export DIFF_CONTRASTS=""          # Example: treated:control,drug:vehicle
 export MIN_REPLICATES_DIFF=2
 export DIFF_PEAK_SET_SCOPE="mark_all" # mark_all uses MARK__all consensus sets for differential binding.

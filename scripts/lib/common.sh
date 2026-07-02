@@ -113,7 +113,9 @@ ensure_dir() {
 }
 
 safe_name() {
-  printf '%s\n' "$1" | tr '/: ' '___'
+  local cleaned
+  cleaned="$(printf '%s' "$1" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//')"
+  printf '%s\n' "${cleaned:-unnamed}"
 }
 
 resolve_path() {
@@ -146,7 +148,7 @@ done_file() {
     120-differential-binding) dir="${DIFF_DIR:-${dir}}" ;;
     130-reports) dir="${REPORT_DIR:-${dir}}" ;;
   esac
-  printf '%s/.done/%s.done\n' "${dir}" "${name}"
+  printf '%s/.done/%s.done\n' "${dir}" "$(safe_name "${name}")"
 }
 
 is_done() {
@@ -247,6 +249,52 @@ trimmed_fastqs_for_sample() {
 filtered_bam_for_sample() {
   local sample_id="$1"
   printf '%s\n' "${FILTER_DIR:-${OUTPUT_DIR}/060-filtering}/${sample_id}/${sample_id}.filtered.bam"
+}
+
+peak_file_for_sample() {
+  local sample_id="$1"
+  local sample_dir="${PEAK_DIR:-${OUTPUT_DIR}/080-peak-calling}/${sample_id}"
+  local manifest="${sample_dir}/${sample_id}.peak_manifest.tsv"
+  local peak_file=""
+
+  [[ -d "${sample_dir}" ]] || return 0
+
+  if [[ -s "${manifest}" ]]; then
+    peak_file="$(awk -F '\t' 'NR==2 {print $3; exit}' "${manifest}")"
+    if [[ -n "${peak_file}" && -s "${peak_file}" ]]; then
+      printf '%s\n' "${peak_file}"
+      return 0
+    fi
+  fi
+
+  find "${sample_dir}" -maxdepth 1 \( -name "${sample_id}_peaks.narrowPeak" -o -name "${sample_id}_peaks.broadPeak" \) -type f | sort | head -n 1
+}
+
+effective_genome_size_value() {
+  local source="${1:-${MACS_GENOME_SIZE:-auto}}"
+  local chrom_sizes="${2:-${REF_DIR:-${OUTPUT_DIR}/010-reference}/chrom.sizes}"
+  local value=""
+
+  if [[ "${source}" != "auto" ]]; then
+    printf '%s\n' "${source}"
+    return 0
+  fi
+
+  if [[ -n "${EFFECTIVE_GENOME_SIZES:-}" && -s "${EFFECTIVE_GENOME_SIZES}" ]]; then
+    value="$(awk '
+      BEGIN { value = "" }
+      /^[[:space:]]*#/ || NF == 0 { next }
+      NF == 1 && value == "" { value = $1 }
+      NF >= 2 && ($1 == "genome" || $1 == "effective_genome_size" || $1 == ENVIRON["GENOME_ID"] || $1 == ENVIRON["ORGANISM_NAME"]) { value = $2 }
+      END { if (value != "") print value }
+    ' "${EFFECTIVE_GENOME_SIZES}")"
+    if [[ -n "${value}" ]]; then
+      printf '%s\n' "${value}"
+      return 0
+    fi
+  fi
+
+  awk '{s+=$2} END {print s}' "${chrom_sizes}"
 }
 
 activate_runtime() {

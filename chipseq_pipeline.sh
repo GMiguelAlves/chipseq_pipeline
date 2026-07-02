@@ -11,6 +11,7 @@ DRY_RUN="false"
 FORCE="false"
 RUN_ALL="false"
 EXECUTOR_OVERRIDE=""
+PREFLIGHT_ONLY="false"
 declare -a REQUESTED_STEPS=()
 
 usage() {
@@ -29,6 +30,7 @@ Options:
   --slurm                Shortcut for --executor slurm
   --mode MODE            Backward-compatible alias for --executor
   --dry-run              Print commands without executing jobs
+  --preflight            Check config, metadata, references, and installed tools
   --resume               Skip steps with .done files (default)
   --force                Re-run steps even when .done files exist
   --step cleanup         Run storage cleanup using PIPELINE_STORAGE_MODE rules
@@ -73,6 +75,10 @@ while [[ "$#" -gt 0 ]]; do
       DRY_RUN="true"
       shift
       ;;
+    --preflight)
+      PREFLIGHT_ONLY="true"
+      shift
+      ;;
     --resume)
       FORCE="false"
       shift
@@ -97,6 +103,11 @@ fi
 
 if [[ "${CONFIG_FILE}" != /* && ! "${CONFIG_FILE}" =~ ^[A-Za-z]:[\\/].* ]]; then
   CONFIG_FILE="${REPO_ROOT}/${CONFIG_FILE}"
+fi
+
+if [[ "${PREFLIGHT_ONLY}" == "true" ]]; then
+  bash "${REPO_ROOT}/scripts/preflight.sh" --config "${CONFIG_FILE}"
+  exit $?
 fi
 
 load_chipseq_config "${CONFIG_FILE}"

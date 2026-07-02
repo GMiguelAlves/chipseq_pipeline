@@ -23,6 +23,12 @@ require_cmd bedtools
 
 GROUP_TABLE="${STEP_DIR}/groups.tsv"
 awk -F '\t' 'BEGIN{OFS="\t"}
+  function clean(x) {
+    gsub(/[^A-Za-z0-9._-]+/, "_", x)
+    gsub(/^_+|_+$/, "", x)
+    if (x == "") x = "unnamed"
+    return x
+  }
   NR==1 {
     for (i=1; i<=NF; i++) {
       if ($i=="sample_id") s=i
@@ -34,7 +40,7 @@ awk -F '\t' 'BEGIN{OFS="\t"}
   }
   NR>1 {
     v=tolower($ctrl)
-    if (v!="true" && v!="1" && v!="yes") print $c"__"$m, $s, $c, $m
+    if (v!="true" && v!="1" && v!="yes") print clean($c)"__"clean($m), $s, $c, $m
   }' "${METADATA_FILE}" > "${GROUP_TABLE}"
 
 cut -f1 "${GROUP_TABLE}" | sort -u | while read -r GROUP_ID; do
@@ -43,7 +49,7 @@ cut -f1 "${GROUP_TABLE}" | sort -u | while read -r GROUP_ID; do
   TMP_BED="${STEP_DIR}/groups/${GROUP_ID}.all_peaks.tmp.bed"
   : > "${TMP_BED}"
   awk -F '\t' -v group="${GROUP_ID}" '$1==group {print $2}' "${GROUP_TABLE}" | while read -r SAMPLE_ID; do
-    PEAK_FILE="$(find "${PEAK_DIR:-${OUTPUT_DIR}/080-peak-calling}/${SAMPLE_ID}" -maxdepth 1 \( -name "*_peaks.narrowPeak" -o -name "*_peaks.broadPeak" \) -type f | head -n 1)"
+    PEAK_FILE="$(peak_file_for_sample "${SAMPLE_ID}")"
     [[ -n "${PEAK_FILE}" && -s "${PEAK_FILE}" ]] || die "${SAMPLE_ID}: peak file not found for consensus"
     awk 'BEGIN{OFS="\t"} {print $1,$2,$3}' "${PEAK_FILE}" >> "${TMP_BED}"
   done
@@ -53,6 +59,12 @@ done
 
 MARK_TABLE="${STEP_DIR}/groups_by_mark.tsv"
 awk -F '\t' 'BEGIN{OFS="\t"}
+  function clean(x) {
+    gsub(/[^A-Za-z0-9._-]+/, "_", x)
+    gsub(/^_+|_+$/, "", x)
+    if (x == "") x = "unnamed"
+    return x
+  }
   NR==1 {
     for (i=1; i<=NF; i++) {
       if ($i=="sample_id") s=i
@@ -63,7 +75,7 @@ awk -F '\t' 'BEGIN{OFS="\t"}
   }
   NR>1 {
     v=tolower($ctrl)
-    if (v!="true" && v!="1" && v!="yes") print $m"__all", $s
+    if (v!="true" && v!="1" && v!="yes") print clean($m)"__all", $s
   }' "${METADATA_FILE}" > "${MARK_TABLE}"
 
 cut -f1 "${MARK_TABLE}" | sort -u | while read -r GROUP_ID; do
@@ -72,7 +84,7 @@ cut -f1 "${MARK_TABLE}" | sort -u | while read -r GROUP_ID; do
   TMP_BED="${STEP_DIR}/groups/${GROUP_ID}.all_peaks.tmp.bed"
   : > "${TMP_BED}"
   awk -F '\t' -v group="${GROUP_ID}" '$1==group {print $2}' "${MARK_TABLE}" | while read -r SAMPLE_ID; do
-    PEAK_FILE="$(find "${PEAK_DIR:-${OUTPUT_DIR}/080-peak-calling}/${SAMPLE_ID}" -maxdepth 1 \( -name "*_peaks.narrowPeak" -o -name "*_peaks.broadPeak" \) -type f | head -n 1)"
+    PEAK_FILE="$(peak_file_for_sample "${SAMPLE_ID}")"
     [[ -n "${PEAK_FILE}" && -s "${PEAK_FILE}" ]] || die "${SAMPLE_ID}: peak file not found for mark-level consensus"
     awk 'BEGIN{OFS="\t"} {print $1,$2,$3}' "${PEAK_FILE}" >> "${TMP_BED}"
   done

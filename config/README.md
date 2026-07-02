@@ -16,6 +16,12 @@ Create them with:
 bash scripts/init_project.sh
 ```
 
+Before submitting jobs, run:
+
+```bash
+bash chipseq_pipeline.sh --preflight
+```
+
 `config/pipeline_config.sh` is the advanced configuration engine. It loads
 `config/user_settings.sh` automatically and defines all derived paths and
 defaults used by the scripts.
@@ -29,6 +35,10 @@ Useful settings in `config/user_settings.sh`:
   BAMs, peaks, tracks, and count matrices
 - `PIPELINE_COMPRESS_RESULTS`: use `1` to write large TSV-like outputs as
   `.tsv.gz`; downstream steps read `.tsv` and `.tsv.gz`
+- `MACS_GENOME_SIZE`: use `auto` for most organisms, or set a numeric effective
+  genome size when you know the right value for MACS peak calling
+- `EFFECTIVE_GENOME_SIZE`: used only for RPGC bigWig normalization; `auto`
+  uses `EFFECTIVE_GENOME_SIZES` when provided, otherwise total FASTA length
 - `DIFF_PEAK_SET_SCOPE`: use `mark_all` to run differential binding only on
   `MARK__all` consensus peak sets, stratified by `mark_or_factor`; use `all`
   only when condition-specific peak sets should also be tested

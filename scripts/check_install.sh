@@ -10,6 +10,10 @@ load_chipseq_config "${CONFIG_FILE}"
 
 missing=0
 
+if [[ "${ENV_BACKEND:-none}" == "conda" ]]; then
+  activate_runtime
+fi
+
 check_cmd() {
   local cmd="$1"
   if command -v "${cmd}" >/dev/null 2>&1; then

@@ -163,9 +163,16 @@ extract_fastp_json <- function(path) {
 }
 
 find_peak_file <- function(peaks_dir, sample_id) {
+  manifest <- file.path(peaks_dir, sample_id, paste0(sample_id, ".peak_manifest.tsv"))
+  if (file.exists(manifest)) {
+    x <- read_tsv_safe(manifest)
+    if (nrow(x) > 0 && "peak_file" %in% names(x) && file.exists(x$peak_file[[1]])) {
+      return(x$peak_file[[1]])
+    }
+  }
   files <- list.files(file.path(peaks_dir, sample_id), pattern = "_peaks\\.(narrowPeak|broadPeak)$", full.names = TRUE)
   if (length(files) == 0) return(NA_character_)
-  files[[1]]
+  sort(files)[[1]]
 }
 
 peak_type_from_file <- function(path) {
